@@ -1,1 +1,1238 @@
-a remplir
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="apple-mobile-web-app-title" content="Coinche"/>
+  <meta name="theme-color" content="#ffffff"/>
+  <title>Coinche</title>
+
+  <!-- iPhone Home Screen icon -->
+  <link rel="apple-touch-icon" href="IconCoinche.png"/>
+  <link rel="icon" href="IconCoinche.png"/>
+
+  <style>
+    :root{
+      --bg: #ffffff;
+      --fg: #111111;
+      --muted: #7a7a7a;
+      --line: #e6e6e6;
+      --line-strong: #1a1a1a;
+      --panel-w: min(360px, 86vw);
+      --bar-h: 64px;
+      --tap: 44px;
+      --radius: 12px;
+      --shadow: 0 10px 30px rgba(0,0,0,.18);
+      --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+
+    *{ box-sizing: border-box; }
+    html, body{ height: 100%; }
+    body{
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* App layout */
+    #app{
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header{
+      padding: 14px 16px 10px;
+    }
+    .hdr{
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .hdr .title{
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: .2px;
+    }
+    .hdr .hint{
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    main{
+      flex: 1;
+      overflow: auto;
+      padding: 0 10px;
+      padding-bottom: calc(var(--bar-h) + env(safe-area-inset-bottom) + 14px);
+    }
+
+    /* Score sheet */
+    .sheet{
+      width: 100%;
+      max-width: 720px;
+      margin: 0 auto;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .sheetHeader{
+      display: grid;
+      grid-template-columns: 26px minmax(66px, 1fr) 54px 6px minmax(66px, 1fr) 54px;
+      align-items: center;
+      background: #fafafa;
+      border-bottom: 1px solid var(--line);
+      padding: 8px 8px;
+      gap: 0;
+    }
+    .sheetHeader .team{
+      font-weight: 700;
+      text-align: center;
+    }
+    .sheetHeader .divider{
+      height: 100%;
+      background: var(--line-strong);
+      border-radius: 4px;
+      justify-self: stretch;
+      align-self: stretch;
+    }
+
+    .rows{ width: 100%; }
+
+    .row{
+      display: grid;
+      grid-template-columns: 26px minmax(66px, 1fr) 54px 6px minmax(66px, 1fr) 54px;
+      align-items: center;
+      padding: 8px 8px;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+    }
+    .row:last-child{ border-bottom: none; }
+
+    .row .no{
+      color: var(--muted);
+      font-size: 12px;
+      text-align: left;
+      padding-right: 4px;
+    }
+
+    .divider{
+      height: 100%;
+      background: var(--line-strong);
+      border-radius: 4px;
+      justify-self: stretch;
+      align-self: stretch;
+    }
+
+    .contract{
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 22px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .contract .coinche{
+      font-weight: 800;
+      letter-spacing: .5px;
+    }
+
+    .totalCell{
+      text-align: right;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      line-height: 1.05;
+      gap: 3px;
+      min-height: 28px;
+    }
+    .total{
+      font-size: 17px;
+      font-weight: 800;
+    }
+    .total.muted{
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .tourPts{
+      font-size: 12px;
+      color: var(--muted);
+      min-height: 14px;
+    }
+
+    .suit{
+      font-weight: 900;
+      font-size: 18px;
+      line-height: 1;
+    }
+    .suit.red{ color: #d21f1f; }
+    .suit.black{ color: #111111; }
+    .suit.none{ color: var(--muted); font-weight: 900; }
+
+    .pendingMark{
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: #cfcfcf;
+      margin-left: 6px;
+      transform: translateY(-1px);
+      flex: 0 0 auto;
+    }
+
+    /* Bottom bar */
+    .bar{
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      height: calc(var(--bar-h) + env(safe-area-inset-bottom));
+      padding: 10px 10px calc(10px + env(safe-area-inset-bottom));
+      background: rgba(255,255,255,.95);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-top: 1px solid var(--line);
+      display: flex;
+      gap: 10px;
+      z-index: 50;
+    }
+    .bar button{
+      flex: 1;
+      height: var(--tap);
+      border-radius: 12px;
+      border: 1px solid #cfcfcf;
+      background: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--fg);
+      touch-action: manipulation;
+    }
+    .bar button.active{
+      border-color: #111;
+      box-shadow: 0 1px 0 rgba(0,0,0,.12);
+    }
+
+    /* Overlay + side panel */
+    .overlay{
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.25);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s ease;
+      z-index: 80;
+    }
+    .overlay.open{
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .panel{
+      position: fixed;
+      top: 0; left: 0;
+      width: var(--panel-w);
+      height: 100%;
+      background: #fff;
+      transform: translateX(-105%);
+      transition: transform .22s ease;
+      z-index: 90;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+    }
+    .panel.open{ transform: translateX(0); }
+
+    .panelHeader{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 12px 12px;
+      border-bottom: 1px solid var(--line);
+      gap: 10px;
+    }
+    .panelHeader .panelTitle{
+      font-size: 18px;
+      font-weight: 800;
+    }
+    .panelHeader .close{
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: #fff;
+      font-size: 18px;
+      font-weight: 800;
+      touch-action: manipulation;
+    }
+
+    .panelBody{
+      padding: 12px;
+      overflow: auto;
+      padding-bottom: calc(18px + env(safe-area-inset-bottom));
+    }
+
+    .field{
+      margin: 12px 0;
+    }
+    .label{
+      display: block;
+      font-size: 13px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+    select, input{
+      width: 100%;
+      height: 44px;
+      border-radius: 12px;
+      border: 1px solid #cfcfcf;
+      padding: 0 12px;
+      font-size: 16px;
+      background: #fff;
+      color: var(--fg);
+    }
+    input[type="number"]{ font-variant-numeric: tabular-nums; }
+
+    .rowInline{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .seg{
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .seg button{
+      height: 40px;
+      padding: 0 12px;
+      border-radius: 999px;
+      border: 1px solid #cfcfcf;
+      background: #fff;
+      font-weight: 800;
+      touch-action: manipulation;
+    }
+    .seg button.on{
+      border-color: #111;
+      box-shadow: 0 1px 0 rgba(0,0,0,.12);
+    }
+
+    .suitPick{
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      border: 1px solid #cfcfcf;
+      border-radius: 12px;
+      padding: 8px;
+    }
+    .suitPick button{
+      flex: 1;
+      height: 42px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      background: #fff;
+      font-size: 18px;
+      font-weight: 900;
+      touch-action: manipulation;
+    }
+    .suitPick button.on{
+      border-color: #111;
+      background: #f6f6f6;
+    }
+    .suitPick button:disabled{
+      opacity: .45;
+    }
+
+    .primary{
+      width: 100%;
+      height: 48px;
+      border-radius: 14px;
+      border: 1px solid #111;
+      background: #111;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 900;
+      touch-action: manipulation;
+      margin-top: 10px;
+    }
+    .danger{
+      width: 100%;
+      height: 48px;
+      border-radius: 14px;
+      border: 1px solid #d21f1f;
+      background: #fff;
+      color: #d21f1f;
+      font-size: 16px;
+      font-weight: 900;
+      touch-action: manipulation;
+    }
+
+    .helper{
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 6px;
+      line-height: 1.35;
+    }
+    .error{
+      font-size: 13px;
+      color: #d21f1f;
+      margin-top: 8px;
+      font-weight: 700;
+    }
+
+    .actionsRow{
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .miniLabel{
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* Reduce accidental zoom on iOS when focusing inputs */
+    input, select, button{ font-size: 16px; }
+  </style>
+</head>
+
+<body>
+  <div id="app">
+    <header>
+      <div class="hdr">
+        <div class="title">Coinche</div>
+        <div class="hint" id="hdrHint">Tour 1</div>
+      </div>
+    </header>
+
+    <main>
+      <div class="sheet" aria-label="Feuille de score">
+        <div class="sheetHeader">
+          <div></div>
+          <div class="team">Nous</div>
+          <div></div>
+          <div class="divider" aria-hidden="true"></div>
+          <div class="team">Eux</div>
+          <div></div>
+        </div>
+        <div class="rows" id="rows"></div>
+      </div>
+    </main>
+
+    <nav class="bar" aria-label="Menu">
+      <button id="btnContrat" data-panel="contrat">Contrat</button>
+      <button id="btnPoints" data-panel="points">Points</button>
+      <button id="btnAutres" data-panel="autres">Autres</button>
+    </nav>
+  </div>
+
+  <div class="overlay" id="overlay"></div>
+
+  <aside class="panel" id="panel" aria-label="Panneau">
+    <div class="panelHeader">
+      <div class="panelTitle" id="panelTitle">Contrat</div>
+      <button class="close" id="panelClose" aria-label="Fermer">✕</button>
+    </div>
+    <div class="panelBody" id="panelBody"></div>
+  </aside>
+
+  <script>
+    (function(){
+      'use strict';
+
+      const STORAGE_KEY = 'coinche_app_v1';
+      const MAX_HISTORY = 60;
+
+      const TEAMS = ['Nous','Eux'];
+
+      const SUITS = [
+        {id:'spade',   sym:'♠', cls:'black'},
+        {id:'club',    sym:'♣', cls:'black'},
+        {id:'heart',   sym:'♥', cls:'red'},
+        {id:'diamond', sym:'♦', cls:'red'},
+        {id:'none',    sym:'-', cls:'none'},
+      ];
+
+      function nowISO(){ return new Date().toISOString(); }
+
+      function emptyState(){
+        return {
+          version: 1,
+          createdAt: nowISO(),
+          tours: {}, // { [n]: { contract: {...}?, points: {Nous:number|null, Eux:number|null} } }
+          undo: [],
+          redo: []
+        };
+      }
+
+      let state = loadState();
+
+      // -------- Persistence ----------
+      function loadState(){
+        try{
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if(!raw) return emptyState();
+          const parsed = JSON.parse(raw);
+          if(!parsed || typeof parsed !== 'object') return emptyState();
+          if(!parsed.tours) parsed.tours = {};
+          if(!Array.isArray(parsed.undo)) parsed.undo = [];
+          if(!Array.isArray(parsed.redo)) parsed.redo = [];
+          return parsed;
+        }catch(e){
+          return emptyState();
+        }
+      }
+
+      function saveState(){
+        try{
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        }catch(e){
+          // ignore (quota, private mode, etc.)
+        }
+      }
+
+      // -------- Helpers ----------
+      function deepClone(obj){
+        return JSON.parse(JSON.stringify(obj));
+      }
+
+      function ensureTour(n){
+        const k = String(n);
+        if(!state.tours[k]){
+          state.tours[k] = {
+            contract: null,
+            points: {Nous: null, Eux: null}
+          };
+        }else{
+          if(!state.tours[k].points) state.tours[k].points = {Nous:null, Eux:null};
+          if(state.tours[k].contract === undefined) state.tours[k].contract = null;
+          if(state.tours[k].points.Nous === undefined) state.tours[k].points.Nous = null;
+          if(state.tours[k].points.Eux === undefined) state.tours[k].points.Eux = null;
+        }
+        return state.tours[k];
+      }
+
+      function isFiniteNumber(x){
+        return typeof x === 'number' && Number.isFinite(x);
+      }
+
+      function parseIntSafe(x){
+        const n = Number.parseInt(String(x), 10);
+        return Number.isFinite(n) ? n : null;
+      }
+
+      function formatSigned(n){
+        if(!isFiniteNumber(n)) return '';
+        if(n === 0) return '+0';
+        return (n > 0 ? '+' : '') + String(n);
+      }
+
+      function suitInfo(id){
+        return SUITS.find(s => s.id === id) || SUITS[0];
+      }
+
+      function currentTour(){
+        // first tour (starting at 1) where points for both teams are not set
+        let i = 1;
+        while(true){
+          const t = state.tours[String(i)];
+          const pn = t && t.points ? t.points.Nous : null;
+          const pe = t && t.points ? t.points.Eux : null;
+          if(isFiniteNumber(pn) && isFiniteNumber(pe)){
+            i++;
+            continue;
+          }
+          return i;
+        }
+      }
+
+      function maxUsedTour(){
+        const keys = Object.keys(state.tours || {});
+        let m = 0;
+        for(const k of keys){
+          const n = parseIntSafe(k);
+          if(n && n > m) m = n;
+        }
+        return m;
+      }
+
+      function displayMaxTour(){
+        const m = maxUsedTour();
+        const c = currentTour();
+        return Math.max(10, m + 2, c + 2);
+      }
+
+      function makeUndoLabel(prefix, team, tour){
+        return `${prefix} ${team} tour ${tour}`;
+      }
+
+      function pushHistory(label){
+        state.undo.push({ snapshot: deepClone({tours: state.tours}), label, at: nowISO() });
+        if(state.undo.length > MAX_HISTORY) state.undo.shift();
+        state.redo = [];
+        saveState();
+      }
+
+      function doUndo(){
+        const last = state.undo.pop();
+        if(!last) return;
+        state.redo.push({ snapshot: deepClone({tours: state.tours}), label: last.label, at: nowISO() });
+        state.tours = last.snapshot.tours || {};
+        saveState();
+        renderAll();
+      }
+
+      function doRedo(){
+        const last = state.redo.pop();
+        if(!last) return;
+        state.undo.push({ snapshot: deepClone({tours: state.tours}), label: last.label, at: nowISO() });
+        if(state.undo.length > MAX_HISTORY) state.undo.shift();
+        state.tours = last.snapshot.tours || {};
+        saveState();
+        renderAll();
+      }
+
+      function resetGame(){
+        state = emptyState();
+        saveState();
+        closePanel();
+        renderAll();
+      }
+
+      // -------- Totals computation ----------
+      function computeRunningTotals(maxTour){
+        let totalNous = 0;
+        let totalEux = 0;
+        let locked = false;
+        const out = {};
+        for(let i=1; i<=maxTour; i++){
+          const t = state.tours[String(i)];
+          const pn = t && t.points ? t.points.Nous : null;
+          const pe = t && t.points ? t.points.Eux : null;
+          const both = isFiniteNumber(pn) && isFiniteNumber(pe);
+
+          if(!locked && both){
+            totalNous += pn;
+            totalEux += pe;
+            out[i] = { Nous: totalNous, Eux: totalEux, computed: true };
+          }else{
+            if(!both) locked = true;
+            out[i] = { Nous: totalNous, Eux: totalEux, computed: false };
+          }
+        }
+        return out;
+      }
+
+      // -------- Rendering (sheet) ----------
+      const elRows = document.getElementById('rows');
+      const elHint = document.getElementById('hdrHint');
+
+      function renderAll(){
+        renderSheet();
+        renderBarActive();
+      }
+
+      function clearEl(el){
+        while(el.firstChild) el.removeChild(el.firstChild);
+      }
+
+      function renderSheet(){
+        const cur = currentTour();
+        elHint.textContent = `Tour ${cur}`;
+
+        const maxT = displayMaxTour();
+        const totals = computeRunningTotals(maxT);
+
+        clearEl(elRows);
+
+        for(let i=1; i<=maxT; i++){
+          const row = document.createElement('div');
+          row.className = 'row';
+
+          const no = document.createElement('div');
+          no.className = 'no';
+          no.textContent = String(i);
+          row.appendChild(no);
+
+          const t = ensureTour(i);
+
+          // Contract cells
+          const cNous = document.createElement('div');
+          cNous.className = 'contract';
+          const cEux = document.createElement('div');
+          cEux.className = 'contract';
+
+          if(t.contract && t.contract.team === 'Nous'){
+            cNous.appendChild(renderContractFragment(t.contract));
+          }else if(t.contract && t.contract.team === 'Eux'){
+            cEux.appendChild(renderContractFragment(t.contract));
+          }
+
+          // Totals + tour points
+          const tn = document.createElement('div');
+          tn.className = 'totalCell';
+
+          const te = document.createElement('div');
+          te.className = 'totalCell';
+
+          const tot = totals[i] || {Nous:0,Eux:0,computed:false};
+          const totalNousEl = document.createElement('div');
+          totalNousEl.className = 'total' + (tot.computed ? '' : ' muted');
+          totalNousEl.textContent = String(tot.Nous);
+
+          const totalEuxEl = document.createElement('div');
+          totalEuxEl.className = 'total' + (tot.computed ? '' : ' muted');
+          totalEuxEl.textContent = String(tot.Eux);
+
+          const ptsNous = document.createElement('div');
+          ptsNous.className = 'tourPts';
+          if(isFiniteNumber(t.points.Nous)) ptsNous.textContent = formatSigned(t.points.Nous);
+
+          const ptsEux = document.createElement('div');
+          ptsEux.className = 'tourPts';
+          if(isFiniteNumber(t.points.Eux)) ptsEux.textContent = formatSigned(t.points.Eux);
+
+          // pending dot if totals not computed but there is partial data on this tour or earlier lock
+          if(!tot.computed){
+            const anyPts = isFiniteNumber(t.points.Nous) || isFiniteNumber(t.points.Eux);
+            if(anyPts){
+              const dot = document.createElement('span');
+              dot.className = 'pendingMark';
+              totalNousEl.appendChild(dot.cloneNode(true));
+              totalEuxEl.appendChild(dot);
+            }
+          }
+
+          tn.appendChild(totalNousEl);
+          tn.appendChild(ptsNous);
+
+          te.appendChild(totalEuxEl);
+          te.appendChild(ptsEux);
+
+          // Assemble row
+          row.appendChild(cNous);
+          row.appendChild(tn);
+
+          const divider = document.createElement('div');
+          divider.className = 'divider';
+          divider.setAttribute('aria-hidden','true');
+          row.appendChild(divider);
+
+          row.appendChild(cEux);
+          row.appendChild(te);
+
+          elRows.appendChild(row);
+        }
+      }
+
+      function renderContractFragment(contract){
+        const frag = document.createDocumentFragment();
+
+        const coinche = contract.coinche || 'none';
+        const suit = contract.suit || 'spade';
+
+        if(contract.kind === 'number'){
+          frag.appendChild(document.createTextNode(String(contract.value) + ' '));
+          frag.appendChild(renderSuitSpan(suit));
+        }else if(contract.kind === 'cap'){
+          frag.appendChild(renderSuitSpan(suit));
+          frag.appendChild(document.createTextNode(' Cap'));
+        }else if(contract.kind === 'gen'){
+          frag.appendChild(document.createTextNode('Gén '));
+          frag.appendChild(renderSuitSpan('none'));
+        }else{
+          frag.appendChild(document.createTextNode('—'));
+        }
+
+        if(coinche === 'C' || coinche === 'SC'){
+          frag.appendChild(document.createTextNode(' '));
+          const c = document.createElement('span');
+          c.className = 'coinche';
+          c.textContent = coinche;
+          frag.appendChild(c);
+        }
+
+        return frag;
+      }
+
+      function renderSuitSpan(suitId){
+        const s = suitInfo(suitId);
+        const sp = document.createElement('span');
+        sp.className = 'suit ' + s.cls;
+        sp.textContent = s.sym;
+        return sp;
+      }
+
+      // -------- Panel handling ----------
+      const overlay = document.getElementById('overlay');
+      const panel = document.getElementById('panel');
+      const panelTitle = document.getElementById('panelTitle');
+      const panelBody = document.getElementById('panelBody');
+      const panelClose = document.getElementById('panelClose');
+
+      const btnContrat = document.getElementById('btnContrat');
+      const btnPoints  = document.getElementById('btnPoints');
+      const btnAutres  = document.getElementById('btnAutres');
+
+      let activePanel = null; // 'contrat'|'points'|'autres'|null
+
+      function openPanel(which){
+        activePanel = which;
+        panelTitle.textContent = which === 'contrat' ? 'Contrat' : (which === 'points' ? 'Points' : 'Autres');
+
+        if(which === 'contrat') renderPanelContrat();
+        if(which === 'points')  renderPanelPoints();
+        if(which === 'autres')  renderPanelAutres();
+
+        overlay.classList.add('open');
+        panel.classList.add('open');
+        renderBarActive();
+      }
+
+      function closePanel(){
+        activePanel = null;
+        overlay.classList.remove('open');
+        panel.classList.remove('open');
+        renderBarActive();
+      }
+
+      function renderBarActive(){
+        const map = {contrat: btnContrat, points: btnPoints, autres: btnAutres};
+        for(const k of Object.keys(map)){
+          map[k].classList.toggle('active', activePanel === k);
+        }
+      }
+
+      overlay.addEventListener('click', closePanel);
+      panelClose.addEventListener('click', closePanel);
+
+      btnContrat.addEventListener('click', () => openPanel('contrat'));
+      btnPoints.addEventListener('click',  () => openPanel('points'));
+      btnAutres.addEventListener('click',  () => openPanel('autres'));
+
+      // -------- Panel: Contrat ----------
+      function renderPanelContrat(){
+        const cur = currentTour();
+
+        panelBody.innerHTML = `
+          <div class="field">
+            <label class="label" for="cTour">Tour</label>
+            <input id="cTour" type="number" min="1" step="1" inputmode="numeric"/>
+          </div>
+
+          <div class="field">
+            <label class="label" for="cWho">Qui</label>
+            <select id="cWho">
+              <option value="Nous">Nous</option>
+              <option value="Eux">Eux</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <span class="label">Couleur</span>
+            <div class="suitPick" id="cSuitPick" role="radiogroup" aria-label="Couleur">
+              ${SUITS.map(s => `
+                <button type="button" class="suitBtn" data-suit="${s.id}" aria-pressed="false" title="${s.sym}">
+                  <span class="suit ${s.cls}">${s.sym}</span>
+                </button>
+              `).join('')}
+            </div>
+            <div class="helper" id="cSuitHelp">Pour une générale : choisis “-”.</div>
+          </div>
+
+          <div class="field">
+            <span class="label">Points</span>
+            <div class="seg" id="cKind">
+              <button type="button" data-kind="number">Nombre</button>
+              <button type="button" data-kind="gen">Gén</button>
+              <button type="button" data-kind="cap">Cap</button>
+            </div>
+            <div id="cNumberWrap" style="margin-top:10px;">
+              <input id="cValue" type="number" min="0" step="10" inputmode="numeric" placeholder="120"/>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="label" for="cCoinche">Coinché</label>
+            <select id="cCoinche">
+              <option value="none">—</option>
+              <option value="C">Coinché</option>
+              <option value="SC">Sur coinché</option>
+            </select>
+          </div>
+
+          <button class="primary" id="cSave">Valider</button>
+          <div class="error" id="cError" style="display:none;"></div>
+          <div class="helper">Astuce : pour modifier un tour, change “Tour”, puis valide.</div>
+        `;
+
+        const cTour = document.getElementById('cTour');
+        const cWho = document.getElementById('cWho');
+        const cCoinche = document.getElementById('cCoinche');
+        const cError = document.getElementById('cError');
+        const suitPick = document.getElementById('cSuitPick');
+        const kindWrap = document.getElementById('cKind');
+        const numberWrap = document.getElementById('cNumberWrap');
+        const cValue = document.getElementById('cValue');
+
+        // Defaults
+        cTour.value = String(cur);
+        let selectedSuit = 'spade';
+        let selectedKind = 'number';
+
+        // Prefill if existing
+        prefillContrat(cur);
+
+        function setError(msg){
+          if(!msg){
+            cError.style.display = 'none';
+            cError.textContent = '';
+            return;
+          }
+          cError.style.display = 'block';
+          cError.textContent = msg;
+        }
+
+        function setSuit(id){
+          selectedSuit = id;
+          const btns = suitPick.querySelectorAll('button.suitBtn');
+          btns.forEach(b => {
+            const on = b.getAttribute('data-suit') === id;
+            b.classList.toggle('on', on);
+            b.setAttribute('aria-pressed', on ? 'true' : 'false');
+          });
+        }
+
+        function setKind(kind){
+          selectedKind = kind;
+          const btns = kindWrap.querySelectorAll('button');
+          btns.forEach(b => b.classList.toggle('on', b.getAttribute('data-kind') === kind));
+          if(kind === 'number'){
+            numberWrap.style.display = 'block';
+            // enable suit picker
+            toggleSuitPickerDisabled(false);
+          }else{
+            numberWrap.style.display = 'none';
+          }
+          if(kind === 'gen'){
+            setSuit('none');
+            toggleSuitPickerDisabled(true); // only '-' is allowed
+          }else if(kind === 'cap'){
+            toggleSuitPickerDisabled(false);
+          }
+        }
+
+        function toggleSuitPickerDisabled(disabled){
+          const btns = suitPick.querySelectorAll('button.suitBtn');
+          btns.forEach(b => {
+            const id = b.getAttribute('data-suit');
+            if(disabled){
+              b.disabled = (id !== 'none');
+            }else{
+              b.disabled = false;
+            }
+          });
+        }
+
+        suitPick.addEventListener('click', (e) => {
+          const btn = e.target.closest('button.suitBtn');
+          if(!btn) return;
+          const id = btn.getAttribute('data-suit');
+          setSuit(id);
+        });
+
+        kindWrap.addEventListener('click', (e) => {
+          const btn = e.target.closest('button[data-kind]');
+          if(!btn) return;
+          setKind(btn.getAttribute('data-kind'));
+        });
+
+        cTour.addEventListener('change', () => {
+          const t = parseIntSafe(cTour.value);
+          if(!t || t < 1){
+            cTour.value = String(cur);
+            prefillContrat(cur);
+            return;
+          }
+          prefillContrat(t);
+        });
+
+        function prefillContrat(tour){
+          ensureTour(tour);
+          const t = state.tours[String(tour)];
+          const c = t && t.contract ? t.contract : null;
+
+          // reset defaults
+          setKind('number');
+          setSuit('spade');
+          cWho.value = 'Nous';
+          cCoinche.value = 'none';
+          cValue.value = '';
+
+          if(c){
+            cWho.value = c.team || 'Nous';
+            cCoinche.value = c.coinche || 'none';
+
+            if(c.kind === 'number'){
+              setKind('number');
+              cValue.value = isFiniteNumber(c.value) ? String(c.value) : '';
+              setSuit(c.suit || 'spade');
+            }else if(c.kind === 'cap'){
+              setKind('cap');
+              setSuit(c.suit || 'spade');
+            }else if(c.kind === 'gen'){
+              setKind('gen');
+              setSuit('none');
+            }
+          }
+          setError('');
+        }
+
+        document.getElementById('cSave').addEventListener('click', () => {
+          setError('');
+
+          const tour = parseIntSafe(cTour.value);
+          if(!tour || tour < 1){
+            setError('Tour invalide.');
+            return;
+          }
+
+          const team = cWho.value === 'Eux' ? 'Eux' : 'Nous';
+          const coinche = cCoinche.value || 'none';
+
+          let contract = { team, coinche: coinche === 'C' ? 'C' : (coinche === 'SC' ? 'SC' : 'none') };
+
+          if(selectedKind === 'number'){
+            const v = Number.parseInt(String(cValue.value || ''), 10);
+            if(!Number.isFinite(v)){
+              setError('Entre un nombre de points.');
+              return;
+            }
+            if(selectedSuit === 'none'){
+              setError('Choisis une couleur (sauf générale).');
+              return;
+            }
+            contract.kind = 'number';
+            contract.value = v;
+            contract.suit = selectedSuit;
+          }else if(selectedKind === 'cap'){
+            if(selectedSuit === 'none'){
+              setError('Choisis une couleur pour Cap.');
+              return;
+            }
+            contract.kind = 'cap';
+            contract.value = null;
+            contract.suit = selectedSuit;
+          }else if(selectedKind === 'gen'){
+            contract.kind = 'gen';
+            contract.value = null;
+            contract.suit = 'none';
+          }else{
+            setError('Contrat invalide.');
+            return;
+          }
+
+          pushHistory(makeUndoLabel('Contrat', team, tour));
+          const t = ensureTour(tour);
+          t.contract = contract;
+          saveState();
+          renderSheet();
+          // Keep panel open; user may chain edits
+        });
+
+        // init kind default + suit highlight
+        setKind(selectedKind);
+        setSuit(selectedSuit);
+      }
+
+      // -------- Panel: Points ----------
+      function renderPanelPoints(){
+        const cur = currentTour();
+
+        panelBody.innerHTML = `
+          <div class="field">
+            <label class="label" for="pTour">Tour</label>
+            <input id="pTour" type="number" min="1" step="1" inputmode="numeric"/>
+          </div>
+
+          <div class="field">
+            <label class="label" for="pWho">Qui</label>
+            <select id="pWho">
+              <option value="Nous">Nous</option>
+              <option value="Eux">Eux</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label class="label" for="pValue">Points</label>
+            <input id="pValue" type="number" step="1" inputmode="numeric" placeholder="140"/>
+          </div>
+
+          <button class="primary" id="pSave">Valider</button>
+          <div class="error" id="pError" style="display:none;"></div>
+          <div class="helper">Le total s’actualise quand les 2 équipes ont leurs points sur le tour.</div>
+        `;
+
+        const pTour = document.getElementById('pTour');
+        const pWho = document.getElementById('pWho');
+        const pValue = document.getElementById('pValue');
+        const pError = document.getElementById('pError');
+
+        const initialCur = cur;
+        pTour.value = String(cur);
+        pWho.value = 'Nous';
+
+        prefillPoints(cur, 'Nous');
+
+        function setError(msg){
+          if(!msg){
+            pError.style.display = 'none';
+            pError.textContent = '';
+            return;
+          }
+          pError.style.display = 'block';
+          pError.textContent = msg;
+        }
+
+        function prefillPoints(tour, team){
+          ensureTour(tour);
+          const t = state.tours[String(tour)];
+          const v = t && t.points ? t.points[team] : null;
+          pValue.value = isFiniteNumber(v) ? String(v) : '';
+          setError('');
+        }
+
+        pTour.addEventListener('change', () => {
+          const tour = parseIntSafe(pTour.value);
+          if(!tour || tour < 1){
+            pTour.value = String(cur);
+            prefillPoints(cur, pWho.value);
+            return;
+          }
+          prefillPoints(tour, pWho.value);
+        });
+
+        pWho.addEventListener('change', () => {
+          const tour = parseIntSafe(pTour.value) || cur;
+          prefillPoints(tour, pWho.value);
+        });
+
+        document.getElementById('pSave').addEventListener('click', () => {
+          setError('');
+
+          const tour = parseIntSafe(pTour.value);
+          if(!tour || tour < 1){
+            setError('Tour invalide.');
+            return;
+          }
+          const team = pWho.value === 'Eux' ? 'Eux' : 'Nous';
+          const v = Number.parseInt(String(pValue.value || ''), 10);
+          if(!Number.isFinite(v)){
+            setError('Entre un nombre de points.');
+            return;
+          }
+
+          pushHistory(makeUndoLabel('Points', team, tour));
+          const t = ensureTour(tour);
+          t.points[team] = v;
+
+          saveState();
+          renderSheet();
+
+          // Auto-advance tour (option C) only if we just completed the current tour
+          const oldCur = initialCur; // tour at panel open
+          const newCur = currentTour();
+          const selectedTour = tour;
+
+          // If the selected tour equals old current tour AND it is now complete, jump to new current tour
+          if(selectedTour === oldCur && newCur !== oldCur){
+            pTour.value = String(newCur);
+            prefillPoints(newCur, team); // keep same team
+          }else{
+            // keep tour, but clear value for quicker next entry
+            // (only if user just entered something and doesn't match existing anymore)
+            prefillPoints(selectedTour, team);
+          }
+
+          // Put cursor back
+          pValue.focus();
+          pValue.select();
+        });
+      }
+
+      // -------- Panel: Autres ----------
+      function renderPanelAutres(){
+        const undoLabel = state.undo.length ? state.undo[state.undo.length-1].label : '—';
+        const redoLabel = state.redo.length ? state.redo[state.redo.length-1].label : '—';
+
+        panelBody.innerHTML = `
+          <div class="actionsRow">
+            <button class="danger" id="aReset">Nouvelle partie</button>
+          </div>
+          <div class="helper">Ça efface tout.</div>
+
+          <div class="field" style="margin-top:18px;">
+            <button class="primary" id="aUndo" ${state.undo.length ? '' : 'disabled'}>Undo</button>
+            <div class="miniLabel">Dernier : ${escapeHtml(undoLabel)}</div>
+          </div>
+
+          <div class="field">
+            <button class="primary" id="aRedo" ${state.redo.length ? '' : 'disabled'}>Redo</button>
+            <div class="miniLabel">Dernier : ${escapeHtml(redoLabel)}</div>
+          </div>
+
+          <div class="helper">Astuce : tu peux éditer un tour en retournant sur Contrat/Points et en choisissant le numéro de tour.</div>
+        `;
+
+        document.getElementById('aReset').addEventListener('click', () => {
+          const ok = confirm('Nouvelle partie : tu confirmes ?');
+          if(ok) resetGame();
+        });
+
+        const undoBtn = document.getElementById('aUndo');
+        const redoBtn = document.getElementById('aRedo');
+
+        undoBtn.addEventListener('click', () => {
+          doUndo();
+          // rerender panel to update labels
+          renderPanelAutres();
+        });
+
+        redoBtn.addEventListener('click', () => {
+          doRedo();
+          renderPanelAutres();
+        });
+      }
+
+      function escapeHtml(s){
+        return String(s || '')
+          .replaceAll('&','&amp;')
+          .replaceAll('<','&lt;')
+          .replaceAll('>','&gt;')
+          .replaceAll('"','&quot;')
+          .replaceAll("'","&#039;");
+      }
+
+      // Initial render
+      renderAll();
+
+      // Keyboard: Esc closes panel (desktop)
+      window.addEventListener('keydown', (e) => {
+        if(e.key === 'Escape' && activePanel) closePanel();
+      });
+
+    })();
+  </script>
+</body>
+</html>
