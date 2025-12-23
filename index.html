@@ -123,6 +123,19 @@
       text-align: left;
       padding-right: 4px;
     }
+	
+    .row .no.current{
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--muted);
+      border-radius: 999px;
+      padding-right: 0;
+      color: var(--fg);
+      font-weight: 700;
+    }
 
     .divider{
       height: 100%;
@@ -137,7 +150,7 @@
       font-weight: 600;
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 1px;
       min-height: 22px;
       white-space: nowrap;
       overflow: hidden;
@@ -157,6 +170,12 @@
       gap: 3px;
       min-height: 28px;
     }
+
+    .totalCell.totalNous{
+      text-align: left;
+      align-items: flex-start;
+    }
+	
     .total{
       font-size: 17px;
       font-weight: 800;
@@ -411,7 +430,7 @@
   <div id="app">
     <header>
       <div class="hdr">
-        <div class="title">Coinche</div>
+        <div class="title" aria-hidden="true"></div>
         <div class="hint" id="hdrHint">Tour 1</div>
       </div>
     </header>
@@ -663,6 +682,7 @@
           const no = document.createElement('div');
           no.className = 'no';
           no.textContent = String(i);
+          if(i === cur) no.classList.add('current');
           row.appendChild(no);
 
           const t = ensureTour(i);
@@ -681,30 +701,34 @@
 
           // Totals + tour points
           const tn = document.createElement('div');
-          tn.className = 'totalCell';
+          tn.className = 'totalCell totalNous';
 
           const te = document.createElement('div');
-          te.className = 'totalCell';
+          te.className = 'totalCell totalEux';
+
+          const hasAnyPoints = isFiniteNumber(t.points.Nous) || isFiniteNumber(t.points.Eux);
+          const showScores = (i < cur) || (i === cur && hasAnyPoints);
 
           const tot = totals[i] || {Nous:0,Eux:0,computed:false};
+
           const totalNousEl = document.createElement('div');
           totalNousEl.className = 'total' + (tot.computed ? '' : ' muted');
-          totalNousEl.textContent = String(tot.Nous);
+          totalNousEl.textContent = showScores ? String(tot.Nous) : '';
 
           const totalEuxEl = document.createElement('div');
           totalEuxEl.className = 'total' + (tot.computed ? '' : ' muted');
-          totalEuxEl.textContent = String(tot.Eux);
+          totalEuxEl.textContent = showScores ? String(tot.Eux) : '';
 
           const ptsNous = document.createElement('div');
           ptsNous.className = 'tourPts';
-          if(isFiniteNumber(t.points.Nous)) ptsNous.textContent = formatSigned(t.points.Nous);
+          if(showScores && isFiniteNumber(t.points.Nous)) ptsNous.textContent = formatSigned(t.points.Nous);
 
           const ptsEux = document.createElement('div');
           ptsEux.className = 'tourPts';
-          if(isFiniteNumber(t.points.Eux)) ptsEux.textContent = formatSigned(t.points.Eux);
+          if(showScores && isFiniteNumber(t.points.Eux)) ptsEux.textContent = formatSigned(t.points.Eux);
 
-          // pending dot if totals not computed but there is partial data on this tour or earlier lock
-          if(!tot.computed){
+          // pending dot only when scores are visible
+          if(showScores && !tot.computed){
             const anyPts = isFiniteNumber(t.points.Nous) || isFiniteNumber(t.points.Eux);
             if(anyPts){
               const dot = document.createElement('span');
@@ -743,26 +767,24 @@
         const suit = contract.suit || 'spade';
 
         if(contract.kind === 'number'){
-          frag.appendChild(document.createTextNode(String(contract.value) + ' '));
+          frag.appendChild(document.createTextNode(String(contract.value)));
           frag.appendChild(renderSuitSpan(suit));
         }else if(contract.kind === 'cap'){
           frag.appendChild(renderSuitSpan(suit));
-          frag.appendChild(document.createTextNode(' Cap'));
+          frag.appendChild(document.createTextNode('Cap'));
         }else if(contract.kind === 'gen'){
-          frag.appendChild(document.createTextNode('Gén '));
+          frag.appendChild(document.createTextNode('Gén'));
           frag.appendChild(renderSuitSpan('none'));
         }else{
           frag.appendChild(document.createTextNode('—'));
         }
 
         if(coinche === 'C' || coinche === 'SC'){
-          frag.appendChild(document.createTextNode(' '));
           const c = document.createElement('span');
           c.className = 'coinche';
           c.textContent = coinche;
           frag.appendChild(c);
         }
-
         return frag;
       }
 
@@ -1043,12 +1065,18 @@
             return;
           }
 
+          const existing = state.tours[String(tour)] && state.tours[String(tour)].contract;
+          if(existing && existing.team && existing.team !== team){
+            setError('L’autre équipe est déjà partie, il faut supprimer son contrat avant d’en entrer un autre');
+            return;
+          }
+
           pushHistory(makeUndoLabel('Contrat', team, tour));
           const t = ensureTour(tour);
           t.contract = contract;
           saveState();
           renderSheet();
-          // Keep panel open; user may chain edits
+          closePanel();
         });
 
         // init kind default + suit highlight
@@ -1089,11 +1117,11 @@
         const pValue = document.getElementById('pValue');
         const pError = document.getElementById('pError');
 
-        const initialCur = cur;
         pTour.value = String(cur);
-        pWho.value = 'Nous';
+        const who0 = suggestWhoForTour(cur);
+        pWho.value = who0;
 
-        prefillPoints(cur, 'Nous');
+        prefillPoints(cur, who0);
 
         function setError(msg){
           if(!msg){
@@ -1103,6 +1131,28 @@
           }
           pError.style.display = 'block';
           pError.textContent = msg;
+        }
+		
+        function suggestWhoForTour(tour){
+          const t = state.tours[String(tour)];
+          const pn = t && t.points ? t.points.Nous : null;
+          const pe = t && t.points ? t.points.Eux : null;
+
+          const hasNous = isFiniteNumber(pn);
+          const hasEux  = isFiniteNumber(pe);
+
+          // Aucun point sur le tour : on prend l’équipe partie (contrat) si dispo
+          if(!hasNous && !hasEux){
+            const ct = t && t.contract ? t.contract.team : null;
+            return (ct === 'Nous' || ct === 'Eux') ? ct : 'Nous';
+          }
+
+          // Un seul côté rempli : on propose l’autre
+          if(hasNous && !hasEux) return 'Eux';
+          if(!hasNous && hasEux) return 'Nous';
+
+          // Sinon : défaut
+          return 'Nous';
         }
 
         function prefillPoints(tour, team){
@@ -1117,10 +1167,14 @@
           const tour = parseIntSafe(pTour.value);
           if(!tour || tour < 1){
             pTour.value = String(cur);
-            prefillPoints(cur, pWho.value);
+            const who = suggestWhoForTour(cur);
+            pWho.value = who;
+            prefillPoints(cur, who);
             return;
           }
-          prefillPoints(tour, pWho.value);
+          const who = suggestWhoForTour(tour);
+          pWho.value = who;
+          prefillPoints(tour, who);
         });
 
         pWho.addEventListener('change', () => {
@@ -1142,6 +1196,9 @@
             setError('Entre un nombre de points.');
             return;
           }
+		  
+          const before = state.tours[String(tour)];
+          const wasComplete = !!(before && before.points && isFiniteNumber(before.points.Nous) && isFiniteNumber(before.points.Eux));
 
           pushHistory(makeUndoLabel('Points', team, tour));
           const t = ensureTour(tour);
@@ -1150,24 +1207,26 @@
           saveState();
           renderSheet();
 
-          // Auto-advance tour (option C) only if we just completed the current tour
-          const oldCur = initialCur; // tour at panel open
-          const newCur = currentTour();
-          const selectedTour = tour;
+          const nowComplete = isFiniteNumber(t.points.Nous) && isFiniteNumber(t.points.Eux);
 
-          // If the selected tour equals old current tour AND it is now complete, jump to new current tour
-          if(selectedTour === oldCur && newCur !== oldCur){
-            pTour.value = String(newCur);
-            prefillPoints(newCur, team); // keep same team
-          }else{
-            // keep tour, but clear value for quicker next entry
-            // (only if user just entered something and doesn't match existing anymore)
-            prefillPoints(selectedTour, team);
+          // Si on vient de compléter le tour (2 équipes), on ferme
+          if(!wasComplete && nowComplete){
+            closePanel();
+            return;
           }
 
-          // Put cursor back
+          // Sinon, on prépare la saisie suivante (souvent l’autre équipe)
+          if(!nowComplete){
+            const nextTeam = suggestWhoForTour(tour);
+            pWho.value = nextTeam;
+            prefillPoints(tour, nextTeam);
+          }else{
+            prefillPoints(tour, team);
+          }
+
           pValue.focus();
           pValue.select();
+		  
         });
       }
 
