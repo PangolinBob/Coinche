@@ -1718,16 +1718,6 @@
           });
         }
 
-        // Donneur (tour en cours) + compteurs
-        state.players = normalizePlayers(state.players);
-        const dealerIdx = dealerIndexForTour(cur);
-        const dealerName = state.players[dealerIdx] || '—';
-
-        const counts = [0,0,0,0];
-        for(let t=1; t<=cur; t++){
-          counts[dealerIndexForTour(t)]++;
-        }
-
         elStatsBody.innerHTML = `
           <div class="statCard">
             <div class="statHead">
@@ -1840,22 +1830,7 @@
               `).join('')}
             </ul>
           </div>
-
-          <div class="statCard">
-            <div class="statHead">
-              <div class="statHeadTitle">Donneur</div>
-              <div class="statHeadSub">Tour ${cur}</div>
-            </div>
-            <div class="donorNow">Donne : <b>${escapeHtml(dealerName)}</b></div>
-            <div class="dealCounts">
-              ${state.players.map((name, idx) => `
-                <div class="dealCount ${idx === dealerIdx ? 'on' : ''}">
-                  <span class="who">${escapeHtml(twoLetters(name))}</span>
-                  <span class="num">${counts[idx]}</span>
-                </div>
-              `).join('')}
-            </div>
-          </div>
+          
         `;
       }
 
