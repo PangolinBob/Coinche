@@ -20,6 +20,7 @@
       --muted: #7a7a7a;
       --line: #e6e6e6;
       --line-strong: #1a1a1a;
+		--blue-rgb: 31, 111, 210; /* même bleu que le graphe Nous (#1f6fd2) */
       --panel-w: min(320px, 82vw);
       --bar-h: 64px;
       --tap: 44px;
@@ -342,14 +343,16 @@
       z-index: 50;
     }
     .bar button{
+		transition: background-color .12s ease, border-color .12s ease, transform .06s ease;
+		box-shadow: inset 0 1px 0 rgba(255,255,255,.35);
       flex: 1;
       height: var(--tap);
       border-radius: 12px;
-      border: 1px solid #cfcfcf;
-      background: #fff;
+      border: 1px solid rgba(var(--blue-rgb), .25);
+      background: rgba(var(--blue-rgb), .18);
       font-size: 16px;
       font-weight: 700;
-      color: var(--fg);
+      color: #111;
       touch-action: manipulation;
     }
     .bar button.active{
