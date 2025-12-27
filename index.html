@@ -156,6 +156,11 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+	
+	.contractEux{
+	  padding-left: 4px; /* ajuste 2–6px selon ton goût */
+	}
+	
     .contract .coinche{
       font-weight: 800;
       letter-spacing: .5px;
@@ -184,11 +189,21 @@
       color: var(--muted);
       font-weight: 700;
     }
+	
+	.total.win{
+	  color: rgba(0, 150, 0, .9);
+	}
+	
     .tourPts{
       font-size: 12px;
       color: var(--muted);
       min-height: 14px;
     }
+	
+	.tourPts.win{
+	  color: #1a8f2b;     /* vert lisible */
+	  font-weight: 800;  /* un poil plus “winner” */
+	}
 
     .suit{
       font-weight: 900;
@@ -380,7 +395,7 @@
 		border: 1px solid rgba(0,0,0,.18);
 		background: rgba(144, 238, 144, .72); /* vert clair avec léger alpha */
 		color: #111;
-		box-shadow: 0 1px 0 rgba(0,0,0,.10);
+		box-shadow: 0 1px 0 rgba(0,0,0,.30);
 	  
       font-size: 16px;
       font-weight: 900;
@@ -694,7 +709,7 @@
           const cNous = document.createElement('div');
           cNous.className = 'contract';
           const cEux = document.createElement('div');
-          cEux.className = 'contract';
+          cEux.className = 'contract contractEux';
 
           if(t.contract && t.contract.team === 'Nous'){
             cNous.appendChild(renderContractFragment(t.contract));
@@ -721,6 +736,12 @@
           const totalEuxEl = document.createElement('div');
           totalEuxEl.className = 'total' + (tot.computed ? '' : ' muted');
           totalEuxEl.textContent = showScores ? String(tot.Eux) : '';
+		  
+			// Sur le dernier tour complété (cur-1), mettre en vert le score le plus grand
+			if(i === cur - 1 && showScores && tot.computed){
+			  if(tot.Nous > tot.Eux) totalNousEl.classList.add('win');
+			  else if(tot.Eux > tot.Nous) totalEuxEl.classList.add('win');
+			}
 
           const ptsNous = document.createElement('div');
           ptsNous.className = 'tourPts';
@@ -1298,4 +1319,3 @@
   </script>
 </body>
 </html>
-
