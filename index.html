@@ -81,7 +81,7 @@
       max-width: 720px;
       margin: 0 auto;
       border-radius: 14px;
-      overflow: hidden;
+      overflow: visible;
       border: 1px solid var(--line);
       background: #fff;
     }
@@ -322,6 +322,37 @@
       margin-left: 2px;
     }
 
+    .suitBlock{ }
+    .suitLabel{
+      font-size: 12px;
+      font-weight: 900;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .suitGrid{
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+    }
+    .suitChip{
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+      padding: 8px 0 6px;
+      text-align: center;
+    }
+    .suitChip .suit{
+      display: inline-block;
+    }
+    .suitN{
+      display: block;
+      margin-top: 4px;
+      font-size: 12px;
+      font-weight: 900;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
     .champList{
       list-style: none;
       padding: 0;
@@ -385,6 +416,12 @@
     }
 
     .sheetHeader{
+		position: sticky;
+		top: 0;
+		z-index: 20;
+		border-top-left-radius: 14px;
+		border-top-right-radius: 14px;
+		box-shadow: 0 1px 0 rgba(0,0,0,.08);
       display: grid;
       grid-template-columns: 26px minmax(66px, 1fr) 54px 3px minmax(66px, 1fr) 54px;
       align-items: center;
@@ -795,13 +832,6 @@
 
 <body>
   <div id="app">
-    <header>
-      <div class="hdr">
-        <div class="title" aria-hidden="true"></div>
-        <div class="hint" id="hdrHint">Tour 1</div>
-      </div>
-    </header>
-
     <main>
 	<div id="sheetView">
       <div class="sheet" aria-label="Feuille de score">
@@ -1131,8 +1161,6 @@
 
       // -------- Rendering (sheet) ----------
       const elRows = document.getElementById('rows');
-      const elHint = document.getElementById('hdrHint');
-	  
       const elSheetView = document.getElementById('sheetView');
       const elGraphView = document.getElementById('graphView');
       const elGraphClose = document.getElementById('graphClose');
@@ -1158,7 +1186,6 @@
 
       function renderAll(){
         const cur = currentTour();
-        elHint.textContent = `Tour ${cur}`;
 
         if(showingGraph){
           elSheetView.style.display = 'none';
@@ -1206,7 +1233,6 @@
 
       function renderSheet(){
         const cur = currentTour();
-        elHint.textContent = `Tour ${cur}`;
 
         const maxT = displayMaxTour();
         const totals = computeRunningTotals(maxT);
@@ -1563,6 +1589,11 @@
         const cC = {Nous:0, Eux:0};
         const cSC = {Nous:0, Eux:0};
 
+        const suitsCount = {
+          Nous: {spade:0, club:0, heart:0, diamond:0, none:0},
+          Eux:  {spade:0, club:0, heart:0, diamond:0, none:0},
+        };
+
         let maxContract = null; // {target, team, tour, contract}
         let lastCap = null, lastGen = null, lastC = null, lastSC = null;
 
@@ -1594,6 +1625,9 @@
           if(c.kind === 'cap') lastCap = {team, tour: i, contract: c};
           if(c.kind === 'gen') lastGen = {team, tour: i, contract: c};
 
+          const suit = (c.suit || 'none');
+          const sid = (suitsCount[team][suit] !== undefined) ? suit : 'none';
+          suitsCount[team][sid]++;
         }
 
         const anyContracts = (cCount.Nous + cCount.Eux) > 0;
@@ -1627,6 +1661,17 @@
             return `<span class="contractInline">Gén${suitHtml('none')}${coinche ? `<span class="coinche">${coinche}</span>` : ''}</span>`;
           }
           return '—';
+        }
+
+        function suitChip(id, n){
+          const s = suitInfo(id);
+          const val = anyContracts ? String(n) : '—';
+          return `
+            <div class="suitChip">
+              <span class="suit ${s.cls}">${escapeHtml(s.sym)}</span>
+              <span class="suitN">${val}</span>
+            </div>
+          `;
         }
 
         // Champagne (toujours 3 lignes)
@@ -1736,6 +1781,12 @@
             </div>
             <div style="margin-top:10px;" class="small">C : ${hasTours ? cC.Nous : '—'} / ${hasTours ? cC.Eux : '—'} • SC : ${hasTours ? cSC.Nous : '—'} / ${hasTours ? cSC.Eux : '—'}</div>
           </div>
+
+          <div class="statCard">
+            <div class="statHead">
+              <div class="statHeadTitle">Couleurs annoncées</div>
+              <div class="statHeadSub">${anyContracts ? '' : '—'}</div>
+            </div>
 
             <div class="suitBlock">
               <div class="suitLabel">Nous</div>
