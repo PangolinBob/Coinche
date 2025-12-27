@@ -291,6 +291,36 @@
       transform: translateY(-1px);
       flex: 0 0 auto;
     }
+	
+    /* Qui donne (en bas à droite de la feuille) */
+    .dealerGrid{
+      position: fixed;
+      right: 12px;
+      bottom: calc(var(--bar-h) + env(safe-area-inset-bottom) + 14px);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      z-index: 45;
+    }
+    .dealerCell{
+      width: 54px;
+      height: 44px;
+      border-radius: 12px;
+      border: 1px solid #cfcfcf;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--fg);
+      user-select: none;
+    }
+    .dealerCell.on{
+      border: 1px solid rgba(0,0,0,.18);
+      background: rgba(144, 238, 144, .72); /* même vert que "Valider" */
+      box-shadow: 0 1px 0 rgba(0,0,0,.20);
+    }
 
     /* Bottom bar */
     .bar{
@@ -534,6 +564,8 @@
 		
         <div class="rows" id="rows"></div>
       </div>
+
+      <div id="dealerGrid" class="dealerGrid" aria-label="Qui donne"></div>
       </div>
 
       <div id="graphView" style="display:none;" aria-label="Graphique des scores">
@@ -592,6 +624,8 @@
         return {
           version: 1,
           createdAt: nowISO(),
+          players: ['Joueur 1','Joueur 2','Joueur 3','Joueur 4'],
+          dealerStartIndex: 0, // index du joueur qui donne au tour 1 (0..3)
           tours: {}, // { [n]: { contract: {...}?, points: {Nous:number|null, Eux:number|null} } }
           undo: [],
           redo: []
@@ -610,6 +644,21 @@
           if(!parsed.tours) parsed.tours = {};
           if(!Array.isArray(parsed.undo)) parsed.undo = [];
           if(!Array.isArray(parsed.redo)) parsed.redo = [];
+		  
+          // Placement / donneur
+          if(!Array.isArray(parsed.players) || parsed.players.length !== 4){
+            parsed.players = ['Joueur 1','Joueur 2','Joueur 3','Joueur 4'];
+          }else{
+            parsed.players = parsed.players.map((v, i) => {
+              const s = String((v === null || v === undefined) ? '' : v).trim();
+              return s ? s : `Joueur ${i+1}`;
+            });
+          }
+          const d = parsed.dealerStartIndex;
+          if(!(typeof d === 'number' && Number.isFinite(d) && d >= 0 && d <= 3)){
+            parsed.dealerStartIndex = 0;
+          }
+		  
           return parsed;
         }catch(e){
           return emptyState();
@@ -671,6 +720,39 @@
 		  if(c.kind === 'gen') return 1000;
 		  return null;
 		}
+		
+      function playersDefault(){
+        return ['Joueur 1','Joueur 2','Joueur 3','Joueur 4'];
+      }
+
+      function normalizePlayers(arr){
+        const def = playersDefault();
+        if(!Array.isArray(arr) || arr.length !== 4) return def.slice();
+        const out = [];
+        for(let i=0; i<4; i++){
+          const s = String((arr[i] === null || arr[i] === undefined) ? '' : arr[i]).trim();
+          out.push(s ? s : def[i]);
+        }
+        return out;
+      }
+
+      function twoLetters(name){
+        const raw = String(name || '').trim();
+        if(!raw) return '--';
+        const compact = raw.replace(/\s+/g,'');
+        const chars = Array.from(compact);
+        return chars.slice(0,2).join('') || '--';
+      }
+
+      function dealerIndexForTour(tour){
+        const start =
+          (typeof state.dealerStartIndex === 'number' && Number.isFinite(state.dealerStartIndex))
+            ? state.dealerStartIndex
+            : 0;
+        const t = Number.parseInt(String(tour), 10);
+        if(!Number.isFinite(t) || t < 1) return start;
+        return (start + (t - 1)) % 4;
+      }
 
       function currentTour(){
         // first tour (starting at 1) where points for both teams are not set
@@ -772,8 +854,10 @@
       const elGraphView = document.getElementById('graphView');
       const elGraphClose = document.getElementById('graphClose');
       const elGraphCanvas = document.getElementById('graphCanvas');
+      const elDealerGrid = document.getElementById('dealerGrid');
 
       let showingGraph = false;
+      let placementOpen = false;
 
       elGraphClose.addEventListener('click', () => {
         showingGraph = false;
@@ -798,6 +882,26 @@
 
       function clearEl(el){
         while(el.firstChild) el.removeChild(el.firstChild);
+      }
+	  
+      function renderDealerGrid(){
+        if(!elDealerGrid) return;
+
+        // Normalise + persist
+        state.players = normalizePlayers(state.players);
+
+        const cur = currentTour();
+        const idx = dealerIndexForTour(cur);
+
+        clearEl(elDealerGrid);
+
+        for(let i=0; i<4; i++){
+          const cell = document.createElement('div');
+          cell.className = 'dealerCell' + (i === idx ? ' on' : '');
+          cell.textContent = twoLetters(state.players[i]);
+          cell.title = state.players[i];
+          elDealerGrid.appendChild(cell);
+        }
       }
 
       function renderSheet(){
@@ -908,6 +1012,8 @@
 
           elRows.appendChild(row);
         }
+
+        renderDealerGrid();
       }
 	  
       function roundUp200(n){
@@ -1541,8 +1647,13 @@
       }
 
       // -------- Panel: Autres ----------
+
       function renderPanelAutres(){
         const undoLabel = state.undo.length ? state.undo[state.undo.length-1].label : '—';
+
+        // Placement : normalisation
+        state.players = normalizePlayers(state.players);
+        const p = state.players;
 
         panelBody.innerHTML = `
           <div class="actionsRow">
@@ -1553,7 +1664,27 @@
             <button class="primary" id="aUndo" ${state.undo.length ? '' : 'disabled'}>Undo</button>
             <div class="miniLabel">Dernier : ${escapeHtml(undoLabel)}</div>
           </div>
-		  
+
+          <div class="field">
+            <button class="primary" id="aPlacement">Placement</button>
+
+            <div id="placementBox" style="display:${placementOpen ? 'block' : 'none'}; margin-top:10px;">
+              <div class="rowInline">
+                <input id="pl1" type="text" autocomplete="off" value="${escapeHtml(p[0])}"/>
+                <input id="pl2" type="text" autocomplete="off" value="${escapeHtml(p[1])}"/>
+              </div>
+              <div class="rowInline" style="margin-top:10px;">
+                <input id="pl3" type="text" autocomplete="off" value="${escapeHtml(p[2])}"/>
+                <input id="pl4" type="text" autocomplete="off" value="${escapeHtml(p[3])}"/>
+              </div>
+
+              <div class="field" style="margin-top:12px;">
+                <label class="label" for="plDealer">Qui donne ?</label>
+                <select id="plDealer"></select>
+              </div>
+            </div>
+          </div>
+
           <div class="field">
             <button class="primary" id="aGraph">Graphique</button>
           </div>
@@ -1566,21 +1697,81 @@
         });
 
         const undoBtn = document.getElementById('aUndo');
-
         undoBtn.addEventListener('click', () => {
           doUndo();
-          // rerender panel to update labels
           renderPanelAutres();
         });
-		
+
+        document.getElementById('aPlacement').addEventListener('click', () => {
+          placementOpen = !placementOpen;
+          const box = document.getElementById('placementBox');
+          if(box) box.style.display = placementOpen ? 'block' : 'none';
+        });
+
+        const pl1 = document.getElementById('pl1');
+        const pl2 = document.getElementById('pl2');
+        const pl3 = document.getElementById('pl3');
+        const pl4 = document.getElementById('pl4');
+        const plDealer = document.getElementById('plDealer');
+
+        function rebuildDealerOptions(){
+          if(!plDealer) return;
+          const keep = parseIntSafe(plDealer.value);
+
+          plDealer.innerHTML = state.players.map((name, idx) =>
+            `<option value="${idx}">${escapeHtml(name)}</option>`
+          ).join('');
+
+          const next =
+            (keep !== null && keep >= 0 && keep <= 3) ? keep :
+            ((typeof state.dealerStartIndex === 'number' && Number.isFinite(state.dealerStartIndex) && state.dealerStartIndex >= 0 && state.dealerStartIndex <= 3)
+              ? state.dealerStartIndex
+              : 0);
+
+          plDealer.value = String(next);
+        }
+
+        function syncPlayersFromInputs(){
+          state.players = [
+            String(pl1 ? pl1.value : '').trim() || 'Joueur 1',
+            String(pl2 ? pl2.value : '').trim() || 'Joueur 2',
+            String(pl3 ? pl3.value : '').trim() || 'Joueur 3',
+            String(pl4 ? pl4.value : '').trim() || 'Joueur 4',
+          ];
+          saveState();
+          rebuildDealerOptions();
+          renderDealerGrid();
+        }
+
+        if(plDealer){
+          rebuildDealerOptions();
+
+          plDealer.value = String(
+            (typeof state.dealerStartIndex === 'number' && Number.isFinite(state.dealerStartIndex) && state.dealerStartIndex >= 0 && state.dealerStartIndex <= 3)
+              ? state.dealerStartIndex
+              : 0
+          );
+
+          if(pl1) pl1.addEventListener('input', syncPlayersFromInputs);
+          if(pl2) pl2.addEventListener('input', syncPlayersFromInputs);
+          if(pl3) pl3.addEventListener('input', syncPlayersFromInputs);
+          if(pl4) pl4.addEventListener('input', syncPlayersFromInputs);
+
+          plDealer.addEventListener('change', () => {
+            const idx = parseIntSafe(plDealer.value);
+            state.dealerStartIndex = (idx !== null && idx >= 0 && idx <= 3) ? idx : 0;
+            saveState();
+            renderDealerGrid();
+          });
+        }
+
         document.getElementById('aGraph').addEventListener('click', () => {
           showingGraph = true;
           closePanel();
           renderAll();
         });
-		
       }
-
+	  
       function escapeHtml(s){
         return String(s || '')
           .replaceAll('&','&amp;')
