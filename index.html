@@ -176,6 +176,11 @@
       border-bottom: 1px solid var(--line);
       background: #fff;
     }
+	
+    .row.currentRow{
+      background: rgba(144, 238, 144, .22); /* même vert que "Valider", plus transparent */
+    }
+	
     .row:last-child{ border-bottom: none; }
 
     .row .no{
@@ -609,6 +614,8 @@
       const MAX_HISTORY = 60;
 
       const TEAMS = ['Nous','Eux'];
+      const PRESET_PLAYERS = ['Arnaud','Boris','Gaël','Lionel'];
+      const OTHER_VALUE = '__other__';
 
       const SUITS = [
         {id:'spade',   sym:'♠', cls:'black'},
@@ -624,8 +631,9 @@
         return {
           version: 1,
           createdAt: nowISO(),
-          players: ['Joueur 1','Joueur 2','Joueur 3','Joueur 4'],
-          dealerStartIndex: 0, // index du joueur qui donne au tour 1 (0..3)
+          players: PRESET_PLAYERS.slice(),
+          dealerAnchorTour: 1,   // tour à partir duquel on recale le donneur
+          dealerAnchorIndex: 0,  // index (0..3) du donneur sur dealerAnchorTour
           tours: {}, // { [n]: { contract: {...}?, points: {Nous:number|null, Eux:number|null} } }
           undo: [],
           redo: []
@@ -647,16 +655,26 @@
 		  
           // Placement / donneur
           if(!Array.isArray(parsed.players) || parsed.players.length !== 4){
-            parsed.players = ['Joueur 1','Joueur 2','Joueur 3','Joueur 4'];
+            parsed.players = PRESET_PLAYERS.slice();
           }else{
             parsed.players = parsed.players.map((v, i) => {
               const s = String((v === null || v === undefined) ? '' : v).trim();
-              return s ? s : `Joueur ${i+1}`;
+              return s ? s : PRESET_PLAYERS[i];
             });
+            // si ancien état "Joueur 1..4", on remplace par les prénoms par défaut
+            const wasPlaceholders = parsed.players.every((name, i) => name === `Joueur ${i+1}`);
+            if(wasPlaceholders) parsed.players = PRESET_PLAYERS.slice();
           }
-          const d = parsed.dealerStartIndex;
-          if(!(typeof d === 'number' && Number.isFinite(d) && d >= 0 && d <= 3)){
-            parsed.dealerStartIndex = 0;
+
+          // Donneur : on ancre la rotation sur un tour
+          const hasAnchor =
+            (typeof parsed.dealerAnchorTour === 'number' && Number.isFinite(parsed.dealerAnchorTour) && parsed.dealerAnchorTour >= 1) &&
+            (typeof parsed.dealerAnchorIndex === 'number' && Number.isFinite(parsed.dealerAnchorIndex) && parsed.dealerAnchorIndex >= 0 && parsed.dealerAnchorIndex <= 3);
+
+          if(!hasAnchor){
+            const d = parsed.dealerStartIndex; // compat ancienne version
+            parsed.dealerAnchorTour = 1;
+            parsed.dealerAnchorIndex = (typeof d === 'number' && Number.isFinite(d) && d >= 0 && d <= 3) ? d : 0;
           }
 		  
           return parsed;
@@ -722,7 +740,7 @@
 		}
 		
       function playersDefault(){
-        return ['Joueur 1','Joueur 2','Joueur 3','Joueur 4'];
+        return PRESET_PLAYERS.slice();
       }
 
       function normalizePlayers(arr){
@@ -745,13 +763,20 @@
       }
 
       function dealerIndexForTour(tour){
-        const start =
-          (typeof state.dealerStartIndex === 'number' && Number.isFinite(state.dealerStartIndex))
-            ? state.dealerStartIndex
+        const anchorTour =
+          (typeof state.dealerAnchorTour === 'number' && Number.isFinite(state.dealerAnchorTour) && state.dealerAnchorTour >= 1)
+            ? state.dealerAnchorTour
+            : 1;
+        const anchorIndex =
+          (typeof state.dealerAnchorIndex === 'number' && Number.isFinite(state.dealerAnchorIndex) && state.dealerAnchorIndex >= 0 && state.dealerAnchorIndex <= 3)
+            ? state.dealerAnchorIndex
             : 0;
+
         const t = Number.parseInt(String(tour), 10);
-        if(!Number.isFinite(t) || t < 1) return start;
-        return (start + (t - 1)) % 4;
+        if(!Number.isFinite(t) || t < 1) return anchorIndex;
+
+        const delta = t - anchorTour;
+        return ((anchorIndex + delta) % 4 + 4) % 4; // modulo positif
       }
 
       function currentTour(){
@@ -916,6 +941,7 @@
         for(let i=1; i<=maxT; i++){
           const row = document.createElement('div');
           row.className = 'row';
+			if(i === cur) row.classList.add('currentRow');
 
           const no = document.createElement('div');
           no.className = 'no';
@@ -1241,6 +1267,7 @@
 
       function closePanel(){
         activePanel = null;
+        placementOpen = false; // replier "Placement" à chaque fermeture
         overlay.classList.remove('open');
         panel.classList.remove('open');
         renderBarActive();
@@ -1525,7 +1552,6 @@
 
           <button class="primary" id="pSave">Valider</button>
           <div class="error" id="pError" style="display:none;"></div>
-          <div class="helper">Le total s’actualise quand les 2 équipes ont leurs points sur le tour.</div>
         `;
 
         const pTour = document.getElementById('pTour');
@@ -1655,6 +1681,20 @@
         state.players = normalizePlayers(state.players);
         const p = state.players;
 
+        const p1Preset = PRESET_PLAYERS.includes(p[0]);
+        const p2Preset = PRESET_PLAYERS.includes(p[1]);
+        const p3Preset = PRESET_PLAYERS.includes(p[2]);
+        const p4Preset = PRESET_PLAYERS.includes(p[3]);
+
+        const opt1 = PRESET_PLAYERS.map(n => `<option value="${escapeHtml(n)}" ${p[0]===n ? 'selected' : ''}>${escapeHtml(n)}</option>`).join('') +
+                     `<option value="${OTHER_VALUE}" ${p1Preset ? '' : 'selected'}>Autre</option>`;
+        const opt2 = PRESET_PLAYERS.map(n => `<option value="${escapeHtml(n)}" ${p[1]===n ? 'selected' : ''}>${escapeHtml(n)}</option>`).join('') +
+                     `<option value="${OTHER_VALUE}" ${p2Preset ? '' : 'selected'}>Autre</option>`;
+        const opt3 = PRESET_PLAYERS.map(n => `<option value="${escapeHtml(n)}" ${p[2]===n ? 'selected' : ''}>${escapeHtml(n)}</option>`).join('') +
+                     `<option value="${OTHER_VALUE}" ${p3Preset ? '' : 'selected'}>Autre</option>`;
+        const opt4 = PRESET_PLAYERS.map(n => `<option value="${escapeHtml(n)}" ${p[3]===n ? 'selected' : ''}>${escapeHtml(n)}</option>`).join('') +
+                     `<option value="${OTHER_VALUE}" ${p4Preset ? '' : 'selected'}>Autre</option>`;
+
         panelBody.innerHTML = `
           <div class="actionsRow">
             <button class="danger" id="aReset">Nouvelle partie</button>
@@ -1670,12 +1710,33 @@
 
             <div id="placementBox" style="display:${placementOpen ? 'block' : 'none'}; margin-top:10px;">
               <div class="rowInline">
-                <input id="pl1" type="text" autocomplete="off" value="${escapeHtml(p[0])}"/>
-                <input id="pl2" type="text" autocomplete="off" value="${escapeHtml(p[1])}"/>
+                <div>
+                  <select id="pl1Sel">${opt1}</select>
+                  <input id="pl1Other" type="text" autocomplete="off" placeholder="Nom"
+                         style="display:${p1Preset ? 'none' : 'block'}; margin-top:8px;"
+                         value="${p1Preset ? '' : escapeHtml(p[0])}"/>
+                </div>
+                <div>
+                  <select id="pl2Sel">${opt2}</select>
+                  <input id="pl2Other" type="text" autocomplete="off" placeholder="Nom"
+                         style="display:${p2Preset ? 'none' : 'block'}; margin-top:8px;"
+                         value="${p2Preset ? '' : escapeHtml(p[1])}"/>
+                </div>
               </div>
+
               <div class="rowInline" style="margin-top:10px;">
-                <input id="pl3" type="text" autocomplete="off" value="${escapeHtml(p[2])}"/>
-                <input id="pl4" type="text" autocomplete="off" value="${escapeHtml(p[3])}"/>
+                <div>
+                  <select id="pl3Sel">${opt3}</select>
+                  <input id="pl3Other" type="text" autocomplete="off" placeholder="Nom"
+                         style="display:${p3Preset ? 'none' : 'block'}; margin-top:8px;"
+                         value="${p3Preset ? '' : escapeHtml(p[2])}"/>
+                </div>
+                <div>
+                  <select id="pl4Sel">${opt4}</select>
+                  <input id="pl4Other" type="text" autocomplete="off" placeholder="Nom"
+                         style="display:${p4Preset ? 'none' : 'block'}; margin-top:8px;"
+                         value="${p4Preset ? '' : escapeHtml(p[3])}"/>
+                </div>
               </div>
 
               <div class="field" style="margin-top:12px;">
@@ -1688,7 +1749,6 @@
           <div class="field">
             <button class="primary" id="aGraph">Graphique</button>
           </div>
-
         `;
 
         document.getElementById('aReset').addEventListener('click', () => {
@@ -1708,11 +1768,31 @@
           if(box) box.style.display = placementOpen ? 'block' : 'none';
         });
 
-        const pl1 = document.getElementById('pl1');
-        const pl2 = document.getElementById('pl2');
-        const pl3 = document.getElementById('pl3');
-        const pl4 = document.getElementById('pl4');
+        const pl1Sel = document.getElementById('pl1Sel');
+        const pl2Sel = document.getElementById('pl2Sel');
+        const pl3Sel = document.getElementById('pl3Sel');
+        const pl4Sel = document.getElementById('pl4Sel');
+
+        const pl1Other = document.getElementById('pl1Other');
+        const pl2Other = document.getElementById('pl2Other');
+        const pl3Other = document.getElementById('pl3Other');
+        const pl4Other = document.getElementById('pl4Other');
+
         const plDealer = document.getElementById('plDealer');
+
+        function setOtherVisibility(sel, other){
+          if(!sel || !other) return;
+          other.style.display = (sel.value === OTHER_VALUE) ? 'block' : 'none';
+        }
+
+        function seatName(sel, other, fallback){
+          if(!sel) return fallback;
+          if(sel.value === OTHER_VALUE){
+            const v = String(other ? other.value : '').trim();
+            return v ? v : 'Autre';
+          }
+          return sel.value;
+        }
 
         function rebuildDealerOptions(){
           if(!plDealer) return;
@@ -1722,44 +1802,43 @@
             `<option value="${idx}">${escapeHtml(name)}</option>`
           ).join('');
 
-          const next =
-            (keep !== null && keep >= 0 && keep <= 3) ? keep :
-            ((typeof state.dealerStartIndex === 'number' && Number.isFinite(state.dealerStartIndex) && state.dealerStartIndex >= 0 && state.dealerStartIndex <= 3)
-              ? state.dealerStartIndex
-              : 0);
-
+          const curIdx = dealerIndexForTour(currentTour());
+          const next = (keep !== null && keep >= 0 && keep <= 3) ? keep : curIdx;
           plDealer.value = String(next);
         }
 
-        function syncPlayersFromInputs(){
+        function syncPlayersFromUI(){
           state.players = [
-            String(pl1 ? pl1.value : '').trim() || 'Joueur 1',
-            String(pl2 ? pl2.value : '').trim() || 'Joueur 2',
-            String(pl3 ? pl3.value : '').trim() || 'Joueur 3',
-            String(pl4 ? pl4.value : '').trim() || 'Joueur 4',
+            seatName(pl1Sel, pl1Other, PRESET_PLAYERS[0]),
+            seatName(pl2Sel, pl2Other, PRESET_PLAYERS[1]),
+            seatName(pl3Sel, pl3Other, PRESET_PLAYERS[2]),
+            seatName(pl4Sel, pl4Other, PRESET_PLAYERS[3]),
           ];
           saveState();
           rebuildDealerOptions();
           renderDealerGrid();
         }
 
+        if(pl1Sel) pl1Sel.addEventListener('change', () => { setOtherVisibility(pl1Sel, pl1Other); syncPlayersFromUI(); });
+        if(pl2Sel) pl2Sel.addEventListener('change', () => { setOtherVisibility(pl2Sel, pl2Other); syncPlayersFromUI(); });
+        if(pl3Sel) pl3Sel.addEventListener('change', () => { setOtherVisibility(pl3Sel, pl3Other); syncPlayersFromUI(); });
+        if(pl4Sel) pl4Sel.addEventListener('change', () => { setOtherVisibility(pl4Sel, pl4Other); syncPlayersFromUI(); });
+
+        if(pl1Other) pl1Other.addEventListener('input', syncPlayersFromUI);
+        if(pl2Other) pl2Other.addEventListener('input', syncPlayersFromUI);
+        if(pl3Other) pl3Other.addEventListener('input', syncPlayersFromUI);
+        if(pl4Other) pl4Other.addEventListener('input', syncPlayersFromUI);
+
+        // Donneur = tour en cours : recale la rotation à partir de maintenant
         if(plDealer){
           rebuildDealerOptions();
-
-          plDealer.value = String(
-            (typeof state.dealerStartIndex === 'number' && Number.isFinite(state.dealerStartIndex) && state.dealerStartIndex >= 0 && state.dealerStartIndex <= 3)
-              ? state.dealerStartIndex
-              : 0
-          );
-
-          if(pl1) pl1.addEventListener('input', syncPlayersFromInputs);
-          if(pl2) pl2.addEventListener('input', syncPlayersFromInputs);
-          if(pl3) pl3.addEventListener('input', syncPlayersFromInputs);
-          if(pl4) pl4.addEventListener('input', syncPlayersFromInputs);
+          plDealer.value = String(dealerIndexForTour(currentTour()));
 
           plDealer.addEventListener('change', () => {
             const idx = parseIntSafe(plDealer.value);
-            state.dealerStartIndex = (idx !== null && idx >= 0 && idx <= 3) ? idx : 0;
+            const t = currentTour();
+            state.dealerAnchorTour = t;
+            state.dealerAnchorIndex = (idx !== null && idx >= 0 && idx <= 3) ? idx : 0;
             saveState();
             renderDealerGrid();
           });
