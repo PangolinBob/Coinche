@@ -100,7 +100,7 @@
     }
 	
 	.sheetHeader .teamEux{
-	  transform: translateX(4px); /* "Eux" ajuste 2–8px */
+	  transform: translateX(8px); /* "Eux" ajuste 2–8px */
 	}
 	
     .sheetHeader .divider{
@@ -300,7 +300,7 @@
       gap: 10px;
     }
     .panelHeader .panelTitle{
-      font-size: 18px;
+      font-size: 20px;
       font-weight: 800;
     }
     .panelHeader .close{
@@ -900,7 +900,6 @@
                 </button>
               `).join('')}
             </div>
-            <div class="helper" id="cSuitHelp">Pour une générale : choisis “-”.</div>
           </div>
 
           <div class="field">
@@ -911,7 +910,7 @@
               <button type="button" data-kind="cap">Cap</button>
             </div>
             <div id="cNumberWrap" style="margin-top:10px;">
-              <input id="cValue" type="number" min="0" step="10" inputmode="numeric" placeholder="120"/>
+              <input id="cValue" type="number" min="0" step="10" inputmode="numeric" placeholder="000"/>
             </div>
           </div>
 
@@ -926,7 +925,6 @@
 
           <button class="primary" id="cSave">Valider</button>
           <div class="error" id="cError" style="display:none;"></div>
-          <div class="helper">Astuce : pour modifier un tour, change “Tour”, puis valide.</div>
         `;
 
         const cTour = document.getElementById('cTour');
@@ -1134,7 +1132,7 @@
 
           <div class="field">
             <label class="label" for="pValue">Points</label>
-            <input id="pValue" type="number" step="1" inputmode="numeric" placeholder="140"/>
+            <input id="pValue" type="number" step="1" inputmode="numeric" placeholder="000"/>
           </div>
 
           <button class="primary" id="pSave">Valider</button>
@@ -1281,7 +1279,6 @@
             <div class="miniLabel">Dernier : ${escapeHtml(redoLabel)}</div>
           </div>
 
-          <div class="helper">Astuce : tu peux éditer un tour en retournant sur Contrat/Points et en choisissant le numéro de tour.</div>
         `;
 
         document.getElementById('aReset').addEventListener('click', () => {
