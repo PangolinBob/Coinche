@@ -83,6 +83,61 @@
       border: 1px solid var(--line);
       background: #fff;
     }
+	
+    /* Graph view */
+    #graphView{
+      width: 100%;
+      max-width: 720px;
+      margin: 0 auto;
+    }
+    .graphCard{
+      width: 100%;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+    .graphHeader{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      background: #fafafa;
+      border-bottom: 1px solid var(--line);
+      gap: 10px;
+    }
+    .graphLegend{
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .graphLegend .leg{
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .graphLegend .sw{
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      display: inline-block;
+    }
+    .graphLegend .leg.nous .sw{ background: #1f6fd2; } /* Nous = bleu */
+    .graphLegend .leg.eux  .sw{ background: #d21f1f; } /* Eux = rouge */
+
+    .graphBody{
+      height: min(520px, 62vh);
+      padding: 10px;
+    }
+    #graphCanvas{
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
 
     .sheetHeader{
       display: grid;
@@ -100,7 +155,7 @@
     }
 	
 	.sheetHeader .teamEux{
-	  transform: translateX(8px); /* "Eux" ajuste 2–8px */
+	  transform: translateX(16px); /* "Eux" ajuste 2–8px */
 	}
 	
     .sheetHeader .divider{
@@ -303,7 +358,7 @@
       font-size: 20px;
       font-weight: 800;
     }
-    .panelHeader .close{
+	.panelHeader .close, .graphHeader .close{
       width: 42px;
       height: 42px;
       border-radius: 12px;
@@ -460,6 +515,7 @@
     </header>
 
     <main>
+	<div id="sheetView">
       <div class="sheet" aria-label="Feuille de score">
         <div class="sheetHeader">
           <div></div>
@@ -469,7 +525,24 @@
           <div class="team teamEux">Eux</div>
           <div></div>
         </div>
+		
         <div class="rows" id="rows"></div>
+      </div>
+      </div>
+
+      <div id="graphView" style="display:none;" aria-label="Graphique des scores">
+        <div class="graphCard">
+          <div class="graphHeader">
+            <div class="graphLegend" aria-label="Légende">
+              <span class="leg nous"><span class="sw" aria-hidden="true"></span>Nous</span>
+              <span class="leg eux"><span class="sw" aria-hidden="true"></span>Eux</span>
+            </div>
+            <button class="close" id="graphClose" aria-label="Fermer">✕</button>
+          </div>
+          <div class="graphBody">
+            <canvas id="graphCanvas"></canvas>
+          </div>
+        </div>
       </div>
     </main>
 
@@ -680,9 +753,32 @@
       // -------- Rendering (sheet) ----------
       const elRows = document.getElementById('rows');
       const elHint = document.getElementById('hdrHint');
+	  
+      const elSheetView = document.getElementById('sheetView');
+      const elGraphView = document.getElementById('graphView');
+      const elGraphClose = document.getElementById('graphClose');
+      const elGraphCanvas = document.getElementById('graphCanvas');
+
+      let showingGraph = false;
+
+      elGraphClose.addEventListener('click', () => {
+        showingGraph = false;
+        renderAll();
+      });
 
       function renderAll(){
-        renderSheet();
+        const cur = currentTour();
+        elHint.textContent = `Tour ${cur}`;
+
+        if(showingGraph){
+          elSheetView.style.display = 'none';
+          elGraphView.style.display = 'block';
+          renderGraph();
+        }else{
+          elGraphView.style.display = 'none';
+          elSheetView.style.display = 'block';
+          renderSheet();
+        }
         renderBarActive();
       }
 
@@ -788,6 +884,167 @@
 
           elRows.appendChild(row);
         }
+      }
+	  
+      function roundUp200(n){
+        if(!Number.isFinite(n) || n <= 0) return 200;
+        return Math.max(200, Math.ceil(n / 200) * 200);
+      }
+
+      function renderGraph(){
+        const cur = currentTour();
+        const xMax = Math.max(1, cur);
+        const lastComplete = Math.max(0, cur - 1);
+
+        // Courbes: on s’arrête au dernier tour complet
+        const totals = computeRunningTotals(lastComplete);
+
+        // Max Y = max score, arrondi au multiple de 200 au-dessus
+        let maxVal = 0;
+        for(let i=1; i<=lastComplete; i++){
+          const tot = totals[i];
+          if(tot && tot.computed){
+            if(tot.Nous > maxVal) maxVal = tot.Nous;
+            if(tot.Eux > maxVal) maxVal = tot.Eux;
+          }
+        }
+        const yMax = roundUp200(maxVal);
+
+        const canvas = elGraphCanvas;
+        const ctx = canvas.getContext('2d');
+        if(!ctx) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const cssW = Math.max(10, rect.width);
+        const cssH = Math.max(10, rect.height);
+        const dpr = window.devicePixelRatio || 1;
+
+        canvas.width = Math.round(cssW * dpr);
+        canvas.height = Math.round(cssH * dpr);
+        ctx.setTransform(dpr,0,0,dpr,0,0);
+        ctx.clearRect(0,0,cssW,cssH);
+
+        const padL = 44, padR = 24, padT = 12, padB = 30;
+        const w = cssW, h = cssH;
+        const pw = w - padL - padR;
+        const ph = h - padT - padB;
+
+        ctx.font = '12px -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial';
+        ctx.fillStyle = 'rgba(0,0,0,.55)';
+
+        function xToPx(x){
+          if(xMax <= 1) return padL;
+          return padL + ((x - 1) / (xMax - 1)) * pw;
+        }
+        function yToPx(y){
+          const yy = Math.max(0, Math.min(yMax, y));
+          return padT + (1 - (yy / yMax)) * ph;
+        }
+
+        // Grille Y: pas de 200, labels allégés si besoin
+        const steps = Math.max(1, Math.round(yMax / 200));
+        const labelEvery = steps > 12 ? 2 : 1;
+
+        ctx.strokeStyle = 'rgba(0,0,0,.10)';
+        ctx.lineWidth = 1;
+
+        for(let k=0; k<=steps; k++){
+          const yVal = k * 200;
+          const y = yToPx(yVal);
+
+          ctx.beginPath();
+          ctx.moveTo(padL, y);
+          ctx.lineTo(padL + pw, y);
+          ctx.stroke();
+
+          if(k % labelEvery === 0){
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(String(yVal), padL - 6, y);
+          }
+        }
+
+        // Axes
+        ctx.strokeStyle = 'rgba(0,0,0,.28)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(padL, padT);
+        ctx.lineTo(padL, padT + ph);
+        ctx.lineTo(padL + pw, padT + ph);
+        ctx.stroke();
+
+        // Labels X: tours (jusqu’au tour en cours)
+        ctx.fillStyle = 'rgba(0,0,0,.55)';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        const xStep = xMax <= 12 ? 1 : Math.ceil(xMax / 10);
+        for(let x=1; x<=xMax; x+=xStep){
+          const xx = xToPx(x);
+          ctx.fillText(String(x), xx, padT + ph + 6);
+        }
+
+        function drawSeries(team, color){
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 2;
+
+          let last = null;
+          let started = false;
+
+          for(let i=1; i<=lastComplete; i++){
+            const tot = totals[i];
+            if(!tot || !tot.computed) continue;
+
+            const xx = xToPx(i);
+            const yy = yToPx(tot[team]);
+
+            if(!started){
+              ctx.beginPath();
+              ctx.moveTo(xx, yy);
+              started = true;
+            }else{
+              ctx.lineTo(xx, yy);
+            }
+            last = {x: xx, y: yy, val: tot[team], tour: i};
+          }
+
+          if(started) ctx.stroke();
+          return last;
+        }
+
+        const blue = '#1f6fd2'; // Nous
+        const red  = '#d21f1f'; // Eux
+
+        const lastNous = drawSeries('Nous', blue);
+        const lastEux  = drawSeries('Eux',  red);
+
+        function drawDot(pt, color){
+          if(!pt) return;
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, 3.5, 0, Math.PI*2);
+          ctx.fill();
+        }
+        drawDot(lastNous, blue);
+        drawDot(lastEux, red);
+
+        // Score final à droite du dernier point
+        let dyNous = 0, dyEux = 0;
+        if(lastNous && lastEux && Math.abs(lastNous.y - lastEux.y) < 14){
+          if(lastNous.y < lastEux.y){ dyNous = -8; dyEux = 8; }
+          else { dyNous = 8; dyEux = -8; }
+        }
+
+        function drawEndLabel(pt, color, dy){
+          if(!pt) return;
+          ctx.fillStyle = color;
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          const lx = Math.min(padL + pw + 6, pt.x + 8);
+          const ly = pt.y + (dy || 0);
+          ctx.fillText(String(pt.val), lx, ly);
+        }
+        drawEndLabel(lastNous, blue, dyNous);
+        drawEndLabel(lastEux, red, dyEux);
       }
 
       function renderContractFragment(contract){
@@ -1102,9 +1359,10 @@
           pushHistory(makeUndoLabel('Contrat', team, tour));
           const t = ensureTour(tour);
           t.contract = contract;
-          saveState();
-          renderSheet();
-          closePanel();
+		  
+			saveState();
+			renderAll();
+			closePanel();
         });
 
         // init kind default + suit highlight
@@ -1232,8 +1490,8 @@
           const t = ensureTour(tour);
           t.points[team] = v;
 
-          saveState();
-          renderSheet();
+			saveState();
+			renderAll();
 
           const nowComplete = isFiniteNumber(t.points.Nous) && isFiniteNumber(t.points.Eux);
 
@@ -1261,22 +1519,19 @@
       // -------- Panel: Autres ----------
       function renderPanelAutres(){
         const undoLabel = state.undo.length ? state.undo[state.undo.length-1].label : '—';
-        const redoLabel = state.redo.length ? state.redo[state.redo.length-1].label : '—';
 
         panelBody.innerHTML = `
           <div class="actionsRow">
             <button class="danger" id="aReset">Nouvelle partie</button>
           </div>
-          <div class="helper">Ça efface tout.</div>
 
           <div class="field" style="margin-top:18px;">
             <button class="primary" id="aUndo" ${state.undo.length ? '' : 'disabled'}>Undo</button>
             <div class="miniLabel">Dernier : ${escapeHtml(undoLabel)}</div>
           </div>
-
+		  
           <div class="field">
-            <button class="primary" id="aRedo" ${state.redo.length ? '' : 'disabled'}>Redo</button>
-            <div class="miniLabel">Dernier : ${escapeHtml(redoLabel)}</div>
+            <button class="primary" id="aGraph">Graphique</button>
           </div>
 
         `;
@@ -1287,18 +1542,19 @@
         });
 
         const undoBtn = document.getElementById('aUndo');
-        const redoBtn = document.getElementById('aRedo');
 
         undoBtn.addEventListener('click', () => {
           doUndo();
           // rerender panel to update labels
           renderPanelAutres();
         });
-
-        redoBtn.addEventListener('click', () => {
-          doRedo();
-          renderPanelAutres();
+		
+        document.getElementById('aGraph').addEventListener('click', () => {
+          showingGraph = true;
+          closePanel();
+          renderAll();
         });
+		
       }
 
       function escapeHtml(s){
@@ -1312,6 +1568,10 @@
 
       // Initial render
       renderAll();
+	  
+      window.addEventListener('resize', () => {
+        if(showingGraph) renderGraph();
+      });
 
       // Keyboard: Esc closes panel (desktop)
       window.addEventListener('keydown', (e) => {
