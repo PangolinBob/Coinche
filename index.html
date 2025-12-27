@@ -155,7 +155,7 @@
     }
 	
 	.sheetHeader .teamEux{
-	  transform: translateX(16px); /* "Eux" ajuste 2–8px */
+	  transform: translateX(18px); /* "Eux" ajuste 2–8px */
 	}
 	
     .sheetHeader .divider{
@@ -226,6 +226,12 @@
       font-weight: 800;
       letter-spacing: .5px;
     }
+	
+	.contract.failed{
+	  text-decoration: line-through;
+	  text-decoration-thickness: 2px;
+	  text-decoration-color: currentColor;
+	}
 
     .totalCell{
       text-align: right;
@@ -657,6 +663,14 @@
       function suitInfo(id){
         return SUITS.find(s => s.id === id) || SUITS[0];
       }
+	  
+		function contractTargetPoints(c){
+		  if(!c) return null;
+		  if(c.kind === 'number') return isFiniteNumber(c.value) ? c.value : null;
+		  if(c.kind === 'cap') return 250;
+		  if(c.kind === 'gen') return 1000;
+		  return null;
+		}
 
       function currentTour(){
         // first tour (starting at 1) where points for both teams are not set
@@ -807,17 +821,27 @@
 
           const t = ensureTour(i);
 
-          // Contract cells
-          const cNous = document.createElement('div');
-          cNous.className = 'contract';
-          const cEux = document.createElement('div');
-          cEux.className = 'contract contractEux';
+		// Contract cells
+		const cNous = document.createElement('div');
+		cNous.className = 'contract';
+		const cEux = document.createElement('div');
+		cEux.className = 'contract contractEux';
 
-          if(t.contract && t.contract.team === 'Nous'){
-            cNous.appendChild(renderContractFragment(t.contract));
-          }else if(t.contract && t.contract.team === 'Eux'){
-            cEux.appendChild(renderContractFragment(t.contract));
-          }
+		if(t.contract && (t.contract.team === 'Nous' || t.contract.team === 'Eux')){
+		  const team = t.contract.team;
+		  const target = contractTargetPoints(t.contract);
+		  const pts = t.points ? t.points[team] : null;
+
+		  const failed = isFiniteNumber(target) && isFiniteNumber(pts) && pts < target;
+
+		  if(team === 'Nous'){
+			cNous.appendChild(renderContractFragment(t.contract));
+			if(failed) cNous.classList.add('failed');
+		  }else{
+			cEux.appendChild(renderContractFragment(t.contract));
+			if(failed) cEux.classList.add('failed');
+		  }
+		}
 
           // Totals + tour points
           const tn = document.createElement('div');
