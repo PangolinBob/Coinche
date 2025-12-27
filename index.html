@@ -24,6 +24,7 @@
 		--red-rgb: 210, 31, 31;
       --panel-w: min(320px, 82vw);
       --bar-h: 64px;
+	  --sheetHeaderH: calc(env(safe-area-inset-top) + 44px);
       --tap: 44px;
       --radius: 12px;
       --shadow: 0 10px 30px rgba(0,0,0,.18);
@@ -84,6 +85,7 @@
       overflow: visible;
       border: 1px solid var(--line);
       background: #fff;
+      padding-top: var(--sheetHeaderH);
     }
 	
     /* Graph view */
@@ -416,20 +418,31 @@
     }
 
     .sheetHeader{
-		position: sticky;
-		top: 0;
-		z-index: 20;
-		border-top-left-radius: 14px;
-		border-top-right-radius: 14px;
-		box-shadow: 0 1px 0 rgba(0,0,0,.08);
+      position: fixed;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(720px, calc(100% - 20px));
+      z-index: 46;
+
+      border-top-left-radius: 14px;
+      border-top-right-radius: 14px;
+      box-shadow: 0 1px 0 rgba(0,0,0,.08);
+
       display: grid;
       grid-template-columns: 26px minmax(66px, 1fr) 54px 3px minmax(66px, 1fr) 54px;
       align-items: center;
       background: #fafafa;
+
+      border: 1px solid var(--line);
       border-bottom: 1px solid var(--line);
-      padding: 8px 8px;
+
+      padding: calc(env(safe-area-inset-top) + 8px) 8px 8px 8px;
       gap: 0;
+
+      pointer-events: none;
     }
+	
     .sheetHeader .team{
       font-weight: 700;
       text-align: center;
@@ -1211,7 +1224,16 @@
       const elStatsView = document.getElementById('statsView');
       const elStatsClose = document.getElementById('statsClose');
       const elStatsBody = document.getElementById('statsBody');
+	  
+      const elSheet = document.querySelector('#sheetView .sheet');
+      const elSheetHeader = document.querySelector('#sheetView .sheetHeader');
 
+      function syncSheetHeaderSpace(){
+        if(!elSheet || !elSheetHeader) return;
+        const h = Math.ceil(elSheetHeader.getBoundingClientRect().height);
+        document.documentElement.style.setProperty('--sheetHeaderH', h + 'px');
+      }
+	  
       let showingGraph = false;
       let showingStats = false;
       let placementOpen = false;
@@ -1275,6 +1297,7 @@
           elStatsView.style.display = 'none';
           elSheetView.style.display = 'block';
           renderSheet();
+          syncSheetHeaderSpace();
         }
 
         renderBarActive();
@@ -2584,6 +2607,7 @@
 	  
       window.addEventListener('resize', () => {
         if(showingGraph) renderGraph();
+        if(!showingGraph && !showingStats) syncSheetHeaderSpace();
       });
 
       // Keyboard: Esc closes panel (desktop)
