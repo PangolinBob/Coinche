@@ -21,6 +21,7 @@
       --line: #e6e6e6;
       --line-strong: #1a1a1a;
 		--blue-rgb: 31, 111, 210; /* même bleu que le graphe Nous (#1f6fd2) */
+		--red-rgb: 210, 31, 31;
       --panel-w: min(320px, 82vw);
       --bar-h: 64px;
       --tap: 44px;
@@ -138,6 +139,280 @@
       width: 100%;
       height: 100%;
       display: block;
+    }
+	
+    /* Stats view */
+    #statsView{
+      width: 100%;
+      max-width: 720px;
+      margin: 0 auto;
+    }
+    .statsCard{
+      width: 100%;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+    .statsHeader{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      background: #fafafa;
+      border-bottom: 1px solid var(--line);
+      gap: 10px;
+    }
+    .statsTitle{
+      font-size: 15px;
+      font-weight: 900;
+      letter-spacing: .2px;
+    }
+    .statsBody{
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .statCard{
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+      padding: 12px;
+    }
+    .statHead{
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .statHeadTitle{
+      font-size: 13px;
+      font-weight: 900;
+      color: var(--muted);
+      letter-spacing: .2px;
+    }
+    .statHeadSub{
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .scoreRow{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .scoreBox{
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 10px;
+    }
+    .scoreBox.nous{
+      border-color: rgba(var(--blue-rgb), .22);
+      background: rgba(var(--blue-rgb), .08);
+    }
+    .scoreBox.eux{
+      border-color: rgba(var(--red-rgb), .22);
+      background: rgba(var(--red-rgb), .08);
+    }
+    .scoreName{
+      font-size: 12px;
+      font-weight: 900;
+      color: var(--muted);
+    }
+    .scoreVal{
+      font-size: 28px;
+      font-weight: 900;
+      margin-top: 4px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .deltaRow{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .pill{
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #fafafa;
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .pill.blue{
+      border-color: rgba(var(--blue-rgb), .25);
+      background: rgba(var(--blue-rgb), .14);
+    }
+    .pill.red{
+      border-color: rgba(var(--red-rgb), .25);
+      background: rgba(var(--red-rgb), .14);
+    }
+    .small{
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .kpiGrid{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .kpi{
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 10px;
+      background: #fff;
+    }
+    .kpiLabel{
+      font-size: 12px;
+      font-weight: 900;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .kpiValue{
+      font-size: 18px;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+    }
+    .kpiUnit{
+      font-size: 12px;
+      font-weight: 900;
+      color: var(--muted);
+      margin-left: 4px;
+    }
+    .kpiMini{
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 6px;
+      font-weight: 800;
+    }
+
+    .barWrap{
+      height: 10px;
+      border-radius: 999px;
+      background: #f2f2f2;
+      border: 1px solid var(--line);
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .barFill{
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: rgba(var(--blue-rgb), .45);
+    }
+    .barFill.red{
+      background: rgba(var(--red-rgb), .45);
+    }
+
+    .contractInline{
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .contractInline .coinche{
+      font-weight: 900;
+      margin-left: 2px;
+    }
+
+    .suitBlock{ }
+    .suitLabel{
+      font-size: 12px;
+      font-weight: 900;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .suitGrid{
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+    }
+    .suitChip{
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+      padding: 8px 0 6px;
+      text-align: center;
+    }
+    .suitChip .suit{
+      display: inline-block;
+    }
+    .suitN{
+      display: block;
+      margin-top: 4px;
+      font-size: 12px;
+      font-weight: 900;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .champList{
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .champItem{
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .champItem .emoji{
+      width: 22px;
+      text-align: center;
+      font-size: 18px;
+      line-height: 1.2;
+    }
+    .champItem .txt{
+      font-size: 14px;
+      line-height: 1.25;
+    }
+    .champItem .txt .muted{
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      margin-left: 4px;
+    }
+
+    .donorNow{
+      font-size: 14px;
+      font-weight: 900;
+      margin-bottom: 10px;
+    }
+    .dealCounts{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .dealCount{
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+      padding: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-variant-numeric: tabular-nums;
+    }
+    .dealCount.on{
+      border: 1px solid rgba(0,0,0,.18);
+      background: rgba(144, 238, 144, .22);
+    }
+    .dealCount .who{
+      font-weight: 900;
+    }
+    .dealCount .num{
+      font-weight: 900;
+      color: var(--muted);
     }
 
     .sheetHeader{
@@ -402,7 +677,7 @@
       font-size: 20px;
       font-weight: 800;
     }
-	.panelHeader .close, .graphHeader .close{
+	.panelHeader .close, .graphHeader .close, .statsHeader .close{
       width: 42px;
       height: 42px;
       border-radius: 12px;
@@ -590,6 +865,17 @@
           </div>
         </div>
       </div>
+	  
+      <div id="statsView" style="display:none;" aria-label="Statistiques">
+        <div class="statsCard">
+          <div class="statsHeader">
+            <div class="statsTitle">Statistiques</div>
+            <button class="close" id="statsClose" aria-label="Fermer">✕</button>
+          </div>
+          <div class="statsBody" id="statsBody"></div>
+        </div>
+      </div>
+	  
     </main>
 
     <nav class="bar" aria-label="Menu">
@@ -883,12 +1169,21 @@
       const elGraphClose = document.getElementById('graphClose');
       const elGraphCanvas = document.getElementById('graphCanvas');
       const elDealerGrid = document.getElementById('dealerGrid');
+      const elStatsView = document.getElementById('statsView');
+      const elStatsClose = document.getElementById('statsClose');
+      const elStatsBody = document.getElementById('statsBody');
 
       let showingGraph = false;
+      let showingStats = false;
       let placementOpen = false;
 
       elGraphClose.addEventListener('click', () => {
         showingGraph = false;
+        renderAll();
+      });
+	  
+      elStatsClose.addEventListener('click', () => {
+        showingStats = false;
         renderAll();
       });
 
@@ -898,13 +1193,21 @@
 
         if(showingGraph){
           elSheetView.style.display = 'none';
+          elStatsView.style.display = 'none';
           elGraphView.style.display = 'block';
           renderGraph();
+        }else if(showingStats){
+          elSheetView.style.display = 'none';
+          elGraphView.style.display = 'none';
+          elStatsView.style.display = 'block';
+          renderStats();
         }else{
           elGraphView.style.display = 'none';
+          elStatsView.style.display = 'none';
           elSheetView.style.display = 'block';
           renderSheet();
         }
+
         renderBarActive();
       }
 
@@ -1204,6 +1507,356 @@
         }
         drawEndLabel(lastNous, blue, dyNous);
         drawEndLabel(lastEux, red, dyEux);
+      }
+	  
+      function renderStats(){
+        if(!elStatsBody) return;
+
+        const cur = currentTour();
+        const last = Math.max(0, cur - 1); // tours validés (Option A)
+        const totals = computeRunningTotals(last);
+
+        let totalNous = 0, totalEux = 0;
+        if(last >= 1 && totals[last] && totals[last].computed){
+          totalNous = totals[last].Nous;
+          totalEux = totals[last].Eux;
+        }
+
+        const hasTours = last >= 1;
+
+        // Écart / leader
+        const diff = totalNous - totalEux;
+        let leaderText = 'Égalité';
+        let leaderClass = '';
+        if(diff > 0){ leaderText = `+${diff} Nous`; leaderClass = 'blue'; }
+        else if(diff < 0){ leaderText = `+${(-diff)} Eux`; leaderClass = 'red'; }
+
+        // Changements de leader (si >=2 tours)
+        let leaderChanges = null;
+        if(last >= 2){
+          let prev = null;
+          let changes = 0;
+          for(let i=1; i<=last; i++){
+            const tot = totals[i];
+            if(!tot || !tot.computed) break;
+            let lead = null;
+            if(tot.Nous > tot.Eux) lead = 'Nous';
+            else if(tot.Eux > tot.Nous) lead = 'Eux';
+            if(lead && prev && lead !== prev) changes++;
+            if(lead) prev = lead;
+          }
+          leaderChanges = changes;
+        }
+
+        // Points par tour (best/worst + swing)
+        let bestNous = null, worstNous = null, bestEux = null, worstEux = null;
+        let maxSwing = null;
+
+        for(let i=1; i<=last; i++){
+          const t = state.tours[String(i)];
+          if(!t || !t.points) continue;
+          const pn = t.points.Nous;
+          const pe = t.points.Eux;
+          if(!isFiniteNumber(pn) || !isFiniteNumber(pe)) continue;
+
+          if(!bestNous || pn > bestNous.val) bestNous = {val: pn, tour: i};
+          if(!worstNous || pn < worstNous.val) worstNous = {val: pn, tour: i};
+          if(!bestEux || pe > bestEux.val) bestEux = {val: pe, tour: i};
+          if(!worstEux || pe < worstEux.val) worstEux = {val: pe, tour: i};
+
+          const d = pn - pe;
+          const abs = Math.abs(d);
+          if(!maxSwing || abs > maxSwing.abs){
+            const win = d > 0 ? 'Nous' : d < 0 ? 'Eux' : 'Égal';
+            maxSwing = {abs, tour: i, win, d};
+          }
+        }
+
+        let lastSwingText = '—';
+        if(hasTours){
+          const t = state.tours[String(last)];
+          if(t && t.points && isFiniteNumber(t.points.Nous) && isFiniteNumber(t.points.Eux)){
+            const d = t.points.Nous - t.points.Eux;
+            if(d > 0) lastSwingText = `+${d} Nous`;
+            else if(d < 0) lastSwingText = `+${(-d)} Eux`;
+            else lastSwingText = '0';
+          }
+        }
+
+        const avgNous = hasTours ? Math.round(totalNous / last) : null;
+        const avgEux  = hasTours ? Math.round(totalEux  / last) : null;
+
+        // Contrats + couleurs + “rares”
+        const cCount = {Nous:0, Eux:0};
+        const cOK = {Nous:0, Eux:0};
+        const cFail = {Nous:0, Eux:0};
+        const cSum = {Nous:0, Eux:0};
+        const cC = {Nous:0, Eux:0};
+        const cSC = {Nous:0, Eux:0};
+
+        const suitsCount = {
+          Nous: {spade:0, club:0, heart:0, diamond:0, none:0},
+          Eux:  {spade:0, club:0, heart:0, diamond:0, none:0},
+        };
+
+        let maxContract = null; // {target, team, tour, contract}
+        let lastCap = null, lastGen = null, lastC = null, lastSC = null;
+
+        for(let i=1; i<=last; i++){
+          const t = state.tours[String(i)];
+          const c = t && t.contract ? t.contract : null;
+          if(!c || !c.team) continue;
+
+          const team = (c.team === 'Eux') ? 'Eux' : 'Nous';
+          const target = contractTargetPoints(c);
+
+          cCount[team]++;
+
+          if(isFiniteNumber(target)){
+            cSum[team] += target;
+            if(!maxContract || target > maxContract.target){
+              maxContract = {target, team, tour: i, contract: c};
+            }
+          }
+
+          const ptsTeam = t && t.points ? t.points[team] : null;
+          if(isFiniteNumber(target) && isFiniteNumber(ptsTeam)){
+            if(ptsTeam >= target) cOK[team]++; else cFail[team]++;
+          }
+
+          if(c.coinche === 'SC'){ cSC[team]++; lastSC = {team, tour: i, contract: c}; }
+          else if(c.coinche === 'C'){ cC[team]++; lastC = {team, tour: i, contract: c}; }
+
+          if(c.kind === 'cap') lastCap = {team, tour: i, contract: c};
+          if(c.kind === 'gen') lastGen = {team, tour: i, contract: c};
+
+          const suit = (c.suit || 'none');
+          const sid = (suitsCount[team][suit] !== undefined) ? suit : 'none';
+          suitsCount[team][sid]++;
+        }
+
+        const anyContracts = (cCount.Nous + cCount.Eux) > 0;
+
+        function pct(ok, total){
+          if(total <= 0) return null;
+          return Math.round((ok / total) * 100);
+        }
+
+        const pNous = pct(cOK.Nous, cCount.Nous);
+        const pEux  = pct(cOK.Eux,  cCount.Eux);
+
+        const avgCNous = cCount.Nous > 0 ? Math.round(cSum.Nous / cCount.Nous) : null;
+        const avgCEux  = cCount.Eux  > 0 ? Math.round(cSum.Eux  / cCount.Eux)  : null;
+
+        function suitHtml(id){
+          const s = suitInfo(id);
+          return `<span class="suit ${s.cls}">${escapeHtml(s.sym)}</span>`;
+        }
+
+        function contractHtml(c){
+          if(!c) return '—';
+          const coinche = (c.coinche === 'SC') ? 'SC' : (c.coinche === 'C' ? 'C' : '');
+          if(c.kind === 'number'){
+            return `<span class="contractInline">${escapeHtml(String(c.value))}${suitHtml(c.suit)}${coinche ? `<span class="coinche">${coinche}</span>` : ''}</span>`;
+          }
+          if(c.kind === 'cap'){
+            return `<span class="contractInline">${suitHtml(c.suit)}Cap${coinche ? `<span class="coinche">${coinche}</span>` : ''}</span>`;
+          }
+          if(c.kind === 'gen'){
+            return `<span class="contractInline">Gén${suitHtml('none')}${coinche ? `<span class="coinche">${coinche}</span>` : ''}</span>`;
+          }
+          return '—';
+        }
+
+        function suitChip(id, n){
+          const s = suitInfo(id);
+          const val = anyContracts ? String(n) : '—';
+          return `
+            <div class="suitChip">
+              <span class="suit ${s.cls}">${escapeHtml(s.sym)}</span>
+              <span class="suitN">${val}</span>
+            </div>
+          `;
+        }
+
+        // Champagne (toujours 3 lignes)
+        const champ = [];
+        champ.push({
+          emoji: '🏆',
+          html: maxContract
+            ? `Max contrat : <b>${maxContract.team}</b> ${contractHtml(maxContract.contract)} <span class="muted">(T${maxContract.tour})</span>`
+            : `Max contrat : —`
+        });
+
+        champ.push({
+          emoji: '💥',
+          html: maxSwing
+            ? `Swing max : <b>${maxSwing.abs === 0 ? '0' : ('+'+maxSwing.abs)}</b> ${maxSwing.win} <span class="muted">(T${maxSwing.tour})</span>`
+            : `Swing max : —`
+        });
+
+        let extra = null;
+        if(lastSC) extra = {emoji:'🧨', html:`Sur coinché : <b>${lastSC.team}</b> ${contractHtml(lastSC.contract)} <span class="muted">(T${lastSC.tour})</span>`};
+        else if(lastC) extra = {emoji:'🎯', html:`Coinché : <b>${lastC.team}</b> ${contractHtml(lastC.contract)} <span class="muted">(T${lastC.tour})</span>`};
+        else if(lastGen) extra = {emoji:'👑', html:`Gén : <b>${lastGen.team}</b> ${contractHtml(lastGen.contract)} <span class="muted">(T${lastGen.tour})</span>`};
+        else if(lastCap) extra = {emoji:'🍾', html:`Cap : <b>${lastCap.team}</b> ${contractHtml(lastCap.contract)} <span class="muted">(T${lastCap.tour})</span>`};
+
+        if(extra){
+          champ.push(extra);
+        }else{
+          const bestOverall =
+            (bestNous && bestEux)
+              ? (bestNous.val >= bestEux.val ? {team:'Nous', val:bestNous.val, tour:bestNous.tour}
+                                            : {team:'Eux',  val:bestEux.val,  tour:bestEux.tour})
+              : (bestNous ? {team:'Nous', val:bestNous.val, tour:bestNous.tour}
+                         : (bestEux ? {team:'Eux', val:bestEux.val, tour:bestEux.tour} : null));
+
+          champ.push({
+            emoji: '✨',
+            html: bestOverall ? `Meilleur tour : <b>${bestOverall.team}</b> +${bestOverall.val} <span class="muted">(T${bestOverall.tour})</span>`
+                              : `Meilleur tour : —`
+          });
+        }
+
+        // Donneur (tour en cours) + compteurs
+        state.players = normalizePlayers(state.players);
+        const dealerIdx = dealerIndexForTour(cur);
+        const dealerName = state.players[dealerIdx] || '—';
+
+        const counts = [0,0,0,0];
+        for(let t=1; t<=cur; t++){
+          counts[dealerIndexForTour(t)]++;
+        }
+
+        elStatsBody.innerHTML = `
+          <div class="statCard">
+            <div class="statHead">
+              <div class="statHeadTitle">Résumé</div>
+              <div class="statHeadSub">Tours validés : ${last} • Tour : ${cur}</div>
+            </div>
+            <div class="scoreRow">
+              <div class="scoreBox nous">
+                <div class="scoreName">Nous</div>
+                <div class="scoreVal">${totalNous}</div>
+              </div>
+              <div class="scoreBox eux">
+                <div class="scoreName">Eux</div>
+                <div class="scoreVal">${totalEux}</div>
+              </div>
+            </div>
+            <div class="deltaRow">
+              <span class="pill ${leaderClass}">${escapeHtml(leaderText)}</span>
+              <span class="small">Changements de leader : ${leaderChanges === null ? '—' : leaderChanges}</span>
+            </div>
+          </div>
+
+          <div class="statCard">
+            <div class="statHead">
+              <div class="statHeadTitle">Rythme</div>
+              <div class="statHeadSub">${hasTours ? `Dernier tour : ${escapeHtml(lastSwingText)}` : '—'}</div>
+            </div>
+            <div class="kpiGrid">
+              <div class="kpi">
+                <div class="kpiLabel">Nous</div>
+                <div class="kpiValue">${avgNous === null ? '—' : avgNous}<span class="kpiUnit">/tour</span></div>
+                <div class="kpiMini">Max : ${bestNous ? `+${bestNous.val} (T${bestNous.tour})` : '—'}</div>
+                <div class="kpiMini">Min : ${worstNous ? `+${worstNous.val} (T${worstNous.tour})` : '—'}</div>
+              </div>
+              <div class="kpi">
+                <div class="kpiLabel">Eux</div>
+                <div class="kpiValue">${avgEux === null ? '—' : avgEux}<span class="kpiUnit">/tour</span></div>
+                <div class="kpiMini">Max : ${bestEux ? `+${bestEux.val} (T${bestEux.tour})` : '—'}</div>
+                <div class="kpiMini">Min : ${worstEux ? `+${worstEux.val} (T${worstEux.tour})` : '—'}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="statCard">
+            <div class="statHead">
+              <div class="statHeadTitle">Contrats</div>
+              <div class="statHeadSub">${hasTours ? '' : '—'}</div>
+            </div>
+            <div class="kpiGrid">
+              <div class="kpi">
+                <div class="kpiLabel">Nous</div>
+                <div class="kpiValue">${hasTours ? cCount.Nous : '—'}<span class="kpiUnit">annoncés</span></div>
+                <div class="kpiMini">Réussite : ${pNous === null ? '—' : (pNous + '%')}</div>
+                <div class="barWrap"><div class="barFill" style="width:${pNous === null ? 0 : pNous}%;"></div></div>
+                <div class="kpiMini">Moyenne : ${avgCNous === null ? '—' : avgCNous}</div>
+                <div class="kpiMini">Ratés : ${hasTours ? cFail.Nous : '—'}</div>
+              </div>
+              <div class="kpi">
+                <div class="kpiLabel">Eux</div>
+                <div class="kpiValue">${hasTours ? cCount.Eux : '—'}<span class="kpiUnit">annoncés</span></div>
+                <div class="kpiMini">Réussite : ${pEux === null ? '—' : (pEux + '%')}</div>
+                <div class="barWrap"><div class="barFill red" style="width:${pEux === null ? 0 : pEux}%;"></div></div>
+                <div class="kpiMini">Moyenne : ${avgCEux === null ? '—' : avgCEux}</div>
+                <div class="kpiMini">Ratés : ${hasTours ? cFail.Eux : '—'}</div>
+              </div>
+            </div>
+            <div style="margin-top:10px;" class="small">C : ${hasTours ? cC.Nous : '—'} / ${hasTours ? cC.Eux : '—'} • SC : ${hasTours ? cSC.Nous : '—'} / ${hasTours ? cSC.Eux : '—'}</div>
+          </div>
+
+          <div class="statCard">
+            <div class="statHead">
+              <div class="statHeadTitle">Couleurs annoncées</div>
+              <div class="statHeadSub">${anyContracts ? '' : '—'}</div>
+            </div>
+
+            <div class="suitBlock">
+              <div class="suitLabel">Nous</div>
+              <div class="suitGrid">
+                ${suitChip('spade', suitsCount.Nous.spade)}
+                ${suitChip('club', suitsCount.Nous.club)}
+                ${suitChip('heart', suitsCount.Nous.heart)}
+                ${suitChip('diamond', suitsCount.Nous.diamond)}
+                ${suitChip('none', suitsCount.Nous.none)}
+              </div>
+            </div>
+
+            <div class="suitBlock" style="margin-top:10px;">
+              <div class="suitLabel">Eux</div>
+              <div class="suitGrid">
+                ${suitChip('spade', suitsCount.Eux.spade)}
+                ${suitChip('club', suitsCount.Eux.club)}
+                ${suitChip('heart', suitsCount.Eux.heart)}
+                ${suitChip('diamond', suitsCount.Eux.diamond)}
+                ${suitChip('none', suitsCount.Eux.none)}
+              </div>
+            </div>
+          </div>
+
+          <div class="statCard">
+            <div class="statHead">
+              <div class="statHeadTitle">Champagne</div>
+              <div class="statHeadSub"></div>
+            </div>
+            <ul class="champList">
+              ${champ.slice(0,3).map(it => `
+                <li class="champItem">
+                  <div class="emoji">${it.emoji}</div>
+                  <div class="txt">${it.html}</div>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+
+          <div class="statCard">
+            <div class="statHead">
+              <div class="statHeadTitle">Donneur</div>
+              <div class="statHeadSub">Tour ${cur}</div>
+            </div>
+            <div class="donorNow">Donne : <b>${escapeHtml(dealerName)}</b></div>
+            <div class="dealCounts">
+              ${state.players.map((name, idx) => `
+                <div class="dealCount ${idx === dealerIdx ? 'on' : ''}">
+                  <span class="who">${escapeHtml(twoLetters(name))}</span>
+                  <span class="num">${counts[idx]}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
       }
 
       function renderContractFragment(contract){
@@ -1752,6 +2405,11 @@
           <div class="field">
             <button class="primary" id="aGraph">Graphique</button>
           </div>
+		  
+          <div class="field">
+            <button class="primary" id="aStats">Statistiques</button>
+          </div>
+		  
         `;
 
         document.getElementById('aReset').addEventListener('click', () => {
@@ -1849,9 +2507,18 @@
 
         document.getElementById('aGraph').addEventListener('click', () => {
           showingGraph = true;
+          showingStats = false;
           closePanel();
           renderAll();
         });
+		
+        document.getElementById('aStats').addEventListener('click', () => {
+          showingStats = true;
+          showingGraph = false;
+          closePanel();
+          renderAll();
+        });
+		
       }
 	  
       function escapeHtml(s){
