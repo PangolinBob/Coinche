@@ -640,6 +640,26 @@
       border-color: #111;
       box-shadow: 0 1px 0 rgba(0,0,0,.12);
     }
+	
+    /* Accueil (page d'accueil) */
+    #homeView{
+      position: fixed;
+      inset: 0;
+      z-index: 120;
+      background: #000 url('accueil.png') center center / cover no-repeat;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      user-select: none;
+    }
+    #homeLogo{
+      position: absolute;
+      top: calc(env(safe-area-inset-top) + 12px);
+      right: calc(env(safe-area-inset-right) + 12px);
+      width: clamp(56px, 18vw, 96px);
+      height: clamp(56px, 18vw, 96px);
+      object-fit: contain;
+      filter: drop-shadow(0 8px 18px rgba(0,0,0,.35));
+    }
 
     /* Overlay + side panel */
     .overlay{
@@ -831,6 +851,11 @@
 </head>
 
 <body>
+
+  <div id="homeView" role="button" tabindex="0" aria-label="Accueil">
+    <img id="homeLogo" src="IconCoinche.png" alt="Coinche">
+  </div>
+
   <div id="app">
     <main>
 	<div id="sheetView">
@@ -1173,6 +1198,37 @@
       let showingGraph = false;
       let showingStats = false;
       let placementOpen = false;
+	  
+      // -------- Accueil (home screen) ----------
+      const elHomeView = document.getElementById('homeView');
+
+      function showHome(){
+        if(!elHomeView) return;
+        elHomeView.style.display = 'block';
+      }
+
+      function hideHome(){
+        if(!elHomeView) return;
+        elHomeView.style.display = 'none';
+
+        // Toujours revenir sur la feuille de score
+        showingGraph = false;
+        showingStats = false;
+        closePanel();
+        renderAll();
+      }
+
+      if(elHomeView){
+        elHomeView.addEventListener('click', hideHome);
+
+        // Clavier (desktop)
+        elHomeView.addEventListener('keydown', (e) => {
+          if(e.key === 'Enter' || e.key === ' '){
+            e.preventDefault();
+            hideHome();
+          }
+        });
+      }
 
       elGraphClose.addEventListener('click', () => {
         showingGraph = false;
@@ -2502,6 +2558,12 @@
 
       // Initial render
       renderAll();
+      showHome();
+
+      // Afficher l'accueil à chaque retour au premier plan (PWA iPhone)
+      document.addEventListener('visibilitychange', () => {
+        if(document.visibilityState === 'visible') showHome();
+      });
 	  
       window.addEventListener('resize', () => {
         if(showingGraph) renderGraph();
