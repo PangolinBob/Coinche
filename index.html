@@ -374,37 +374,6 @@
       margin-left: 2px;
     }
 
-    .suitBlock{ }
-    .suitLabel{
-      font-size: 12px;
-      font-weight: 900;
-      color: var(--muted);
-      margin-bottom: 6px;
-    }
-    .suitGrid{
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 8px;
-    }
-    .suitChip{
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      background: #fff;
-      padding: 8px 0 6px;
-      text-align: center;
-    }
-    .suitChip .suit{
-      display: inline-block;
-    }
-    .suitN{
-      display: block;
-      margin-top: 4px;
-      font-size: 12px;
-      font-weight: 900;
-      color: var(--muted);
-      font-variant-numeric: tabular-nums;
-    }
-
     .champList{
       list-style: none;
       padding: 0;
@@ -2001,11 +1970,6 @@
         const cC = {Nous:0, Eux:0};
         const cSC = {Nous:0, Eux:0};
 
-        const suitsCount = {
-          Nous: {spade:0, club:0, heart:0, diamond:0, none:0},
-          Eux:  {spade:0, club:0, heart:0, diamond:0, none:0},
-        };
-
         let maxContract = null; // {target, team, tour, contract}
         let lastCap = null, lastGen = null, lastC = null, lastSC = null;
 
@@ -2037,12 +2001,7 @@
           if(c.kind === 'cap') lastCap = {team, tour: i, contract: c};
           if(c.kind === 'gen') lastGen = {team, tour: i, contract: c};
 
-          const suit = (c.suit || 'none');
-          const sid = (suitsCount[team][suit] !== undefined) ? suit : 'none';
-          suitsCount[team][sid]++;
         }
-
-        const anyContracts = (cCount.Nous + cCount.Eux) > 0;
 
         function pct(ok, total){
           if(total <= 0) return null;
@@ -2073,17 +2032,6 @@
             return `<span class="contractInline">Gén${suitHtml('none')}${coinche ? `<span class="coinche">${coinche}</span>` : ''}</span>`;
           }
           return '—';
-        }
-
-        function suitChip(id, n){
-          const s = suitInfo(id);
-          const val = anyContracts ? String(n) : '—';
-          return `
-            <div class="suitChip">
-              <span class="suit ${s.cls}">${escapeHtml(s.sym)}</span>
-              <span class="suitN">${val}</span>
-            </div>
-          `;
         }
 
         // Champagne (toujours 3 lignes)
@@ -2192,35 +2140,6 @@
               </div>
             </div>
             <div style="margin-top:10px;" class="small">C : ${hasTours ? cC.Nous : '—'} / ${hasTours ? cC.Eux : '—'} • SC : ${hasTours ? cSC.Nous : '—'} / ${hasTours ? cSC.Eux : '—'}</div>
-          </div>
-
-          <div class="statCard">
-            <div class="statHead">
-              <div class="statHeadTitle">Couleurs annoncées</div>
-              <div class="statHeadSub">${anyContracts ? '' : '—'}</div>
-            </div>
-
-            <div class="suitBlock">
-              <div class="suitLabel">Nous</div>
-              <div class="suitGrid">
-                ${suitChip('spade', suitsCount.Nous.spade)}
-                ${suitChip('club', suitsCount.Nous.club)}
-                ${suitChip('heart', suitsCount.Nous.heart)}
-                ${suitChip('diamond', suitsCount.Nous.diamond)}
-                ${suitChip('none', suitsCount.Nous.none)}
-              </div>
-            </div>
-
-            <div class="suitBlock" style="margin-top:10px;">
-              <div class="suitLabel">Eux</div>
-              <div class="suitGrid">
-                ${suitChip('spade', suitsCount.Eux.spade)}
-                ${suitChip('club', suitsCount.Eux.club)}
-                ${suitChip('heart', suitsCount.Eux.heart)}
-                ${suitChip('diamond', suitsCount.Eux.diamond)}
-                ${suitChip('none', suitsCount.Eux.none)}
-              </div>
-            </div>
           </div>
 
           <div class="statCard">
