@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
   <meta name="apple-mobile-web-app-title" content="Coinche"/>
-  <meta name="theme-color" content="#ffffff"/>
+  <meta name="theme-color" content="#eef2f7"/>
   <title>Coinche</title>
 
   <!-- iPhone Home Screen icon -->
@@ -14,28 +14,56 @@
   <link rel="icon" href="IconCoinche.png"/>
 
   <style>
-    :root{
-      --bg: #ffffff;
-      --fg: #111111;
-      --muted: #7a7a7a;
-      --line: #e6e6e6;
-      --line-strong: #1a1a1a;
-		--blue-rgb: 31, 111, 210; /* même bleu que le graphe Nous (#1f6fd2) */
-		--red-rgb: 210, 31, 31;
-      --panel-w: min(320px, 82vw);
-      --bar-h: 64px;
+  
+	:root{
+	  /* Texte & séparateurs */
+	  --fg: #111111;
+	  --muted: #7a7a7a;
+	  --line: rgba(17,17,17,.10);
+	  --line-strong: rgba(17,17,17,.68);
+
+	  /* Couleurs d'équipe (tu modifies ça plus tard si tu veux) */
+	  --blue-rgb: 31, 111, 210; /* Nous */
+	  --red-rgb: 210, 31, 31;   /* Eux */
+
+	  /* Fond d'app (gris iOS + halos) */
+	  --bg-solid: #eef2f7;
+	  --halo-blue-a: .14;
+	  --halo-red-a: .10;
+	  --bg:
+		radial-gradient(1200px 800px at 18% -12%, rgba(var(--blue-rgb), var(--halo-blue-a)), transparent 60%),
+		radial-gradient(1100px 760px at 112% 8%, rgba(var(--red-rgb), var(--halo-red-a)), transparent 58%),
+		linear-gradient(180deg, #f7f9fc 0%, #eef2f7 100%);
+
+	  /* Surfaces "papier" */
+	  --paper: #fffdf7;    /* carte ivoire */
+	  --paper-2: #faf6ee;  /* en-têtes */
+	  --field: #ffffff;    /* champs/textarea (net) */
+
+	  /* Grain (image) */
+	  --grain-url: url('grain.png');
+	  --grain-size: 240px;
+
+	  /* Layout */
+	  --panel-w: min(320px, 82vw);
+	  --bar-h: 64px;
 	  --sheetHeaderH: calc(env(safe-area-inset-top) + 44px);
-      --tap: 44px;
-      --radius: 12px;
-      --shadow: 0 10px 30px rgba(0,0,0,.18);
-      --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
-    }
+	  --tap: 44px;
+	  --radius: 12px;
+
+	  /* Ombres */
+	  --card-shadow: 0 18px 55px rgba(0,0,0,.10);
+	  --shadow: 0 24px 80px rgba(0,0,0,.18);
+
+	  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+	}
 
     *{ box-sizing: border-box; }
     html, body{ height: 100%; }
     body{
       margin: 0;
-      background: var(--bg);
+		background-color: var(--bg-solid);
+		background-image: var(--bg);
       color: var(--fg);
       font-family: var(--font);
       -webkit-font-smoothing: antialiased;
@@ -130,8 +158,8 @@
       border-radius: 999px;
       display: inline-block;
     }
-    .graphLegend .leg.nous .sw{ background: #1f6fd2; } /* Nous = bleu */
-    .graphLegend .leg.eux  .sw{ background: #d21f1f; } /* Eux = rouge */
+	.graphLegend .leg.nous .sw{ background: rgb(var(--blue-rgb)); } /* Nous */
+	.graphLegend .leg.eux  .sw{ background: rgb(var(--red-rgb)); }  /* Eux */
 
     .graphBody{
       height: min(520px, 62vh);
@@ -954,6 +982,62 @@
 
     /* Reduce accidental zoom on iOS when focusing inputs */
     input, select, button, textarea{ font-size: 16px; }
+	
+	/* === Relooking premium discret (fond iOS + papier ivoire + grain) === */
+
+	/* Cartes principales (feuille / graph / stats / export / panneau) */
+	.sheet,
+	.graphCard,
+	.statsCard,
+	.panel{
+	  background-color: var(--paper);
+	  background-image: var(--grain-url);
+	  background-repeat: repeat;
+	  background-size: var(--grain-size) var(--grain-size);
+	  border-color: var(--line);
+	}
+
+	/* Effet "carte qui flotte" (là où ça compte) */
+	.sheet,
+	.graphCard,
+	.statsCard{
+	  box-shadow: var(--card-shadow);
+	}
+
+	/* Dans la feuille : laisse le papier apparaître (sinon le grain est caché) */
+	.row{ background: transparent; }
+
+	/* En-têtes plus mats / premium */
+	.sheetHeader,
+	.graphHeader,
+	.statsHeader,
+	.panelHeader{
+	  background: var(--paper-2);
+	}
+
+	/* Champs : nets (blanc) */
+	select, input, textarea{
+	  background: var(--field);
+	}
+
+	/* Export : zone texte clean */
+	#exportText{
+	  background: var(--field);
+	  color: var(--fg);
+	}
+
+	/* Graph : canvas sur fond blanc pour garder une lecture nickel */
+	#graphCanvas{
+	  background: var(--field);
+	  border-radius: 12px;
+	  box-shadow: inset 0 0 0 1px var(--line);
+	}
+
+	/* Barre du bas : moins "blanc clinique" */
+	.bar{
+	  background: rgba(255,255,255,.82);
+	}
+	
   </style>
   
   <script>
@@ -1769,8 +1853,11 @@
           return last;
         }
 
-        const blue = '#1f6fd2'; // Nous
-        const red  = '#d21f1f'; // Eux
+		const rootStyle = getComputedStyle(document.documentElement);
+		const blueRgb = (rootStyle.getPropertyValue('--blue-rgb') || '31, 111, 210').trim();
+		const redRgb  = (rootStyle.getPropertyValue('--red-rgb')  || '210, 31, 31').trim();
+		const blue = `rgb(${blueRgb})`; // Nous
+		const red  = `rgb(${redRgb})`;  // Eux
 
         const lastNous = drawSeries('Nous', blue);
         const lastEux  = drawSeries('Eux',  red);
