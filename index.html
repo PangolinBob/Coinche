@@ -42,7 +42,7 @@
 
 	  /* Grain (image) */
 	  --grain-url: url('grain.png');
-	  --grain-size: 240px;
+	  --grain-size: 256px;
 
 	  /* Layout */
 	  --panel-w: min(320px, 82vw);
@@ -993,6 +993,7 @@
 	  background-color: var(--paper);
 	  background-image: var(--grain-url);
 	  background-repeat: repeat;
+	  background-blend-mode: soft-light;
 	  background-size: var(--grain-size) var(--grain-size);
 	  border-color: var(--line);
 	}
