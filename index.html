@@ -990,12 +990,17 @@
 	
 	.sheet,
 	.graphCard,
-	.statsCard,
-	.panel{
+	.statsCard{
 	  background: var(--paper);      /* ivoire visible */
 	  border-color: var(--line);
 	  position: relative;
 	  isolation: isolate;            /* le grain reste “dans” la carte */
+	}
+
+	.panel{
+	  background: var(--paper);      /* ivoire visible */
+	  border-color: var(--line);
+	  isolation: isolate;            /* OK pour le grain, sans toucher au position: fixed */
 	}
 
 	/* Grain en surcouche (donc plus de fond gris) */
