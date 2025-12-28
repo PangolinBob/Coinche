@@ -43,6 +43,7 @@
 	  /* Grain (image) */
 	  --grain-url: url('grain.png');
 	  --grain-size: 256px;
+	  --grain-opacity: .10; /* ← ajuste ici (0.06 très discret, 0.14 plus présent) */
 
 	  /* Layout */
 	  --panel-w: min(320px, 82vw);
@@ -986,17 +987,34 @@
 	/* === Relooking premium discret (fond iOS + papier ivoire + grain) === */
 
 	/* Cartes principales (feuille / graph / stats / export / panneau) */
+	
 	.sheet,
 	.graphCard,
 	.statsCard,
 	.panel{
-	  background-color: var(--paper);
+	  background: var(--paper);      /* ivoire visible */
+	  border-color: var(--line);
+	  position: relative;
+	  isolation: isolate;            /* le grain reste “dans” la carte */
+	}
+
+	/* Grain en surcouche (donc plus de fond gris) */
+	.sheet::before,
+	.graphCard::before,
+	.statsCard::before,
+	.panel::before{
+	  content: '';
+	  position: absolute;
+	  inset: 0;
 	  background-image: var(--grain-url);
 	  background-repeat: repeat;
-	  background-blend-mode: soft-light;
 	  background-size: var(--grain-size) var(--grain-size);
-	  border-color: var(--line);
+	  opacity: var(--grain-opacity);
+	  mix-blend-mode: soft-light;
+	  pointer-events: none;
+	  border-radius: inherit;
 	}
+	
 
 	/* Effet "carte qui flotte" (là où ça compte) */
 	.sheet,
