@@ -1100,6 +1100,7 @@
           players: PRESET_PLAYERS.slice(),
           dealerAnchorTour: 1,   // tour à partir duquel on recale le donneur
           dealerAnchorIndex: 0,  // index (0..3) du donneur sur dealerAnchorTour
+          scoreKeeperIndex: 0,  // index (0..3) du joueur qui tient les scores (équipe Nous)
           tours: {}, // { [n]: { contract: {...}?, points: {Nous:number|null, Eux:number|null} } }
           undo: [],
           redo: []
@@ -1142,6 +1143,10 @@
             parsed.dealerAnchorTour = 1;
             parsed.dealerAnchorIndex = (typeof d === 'number' && Number.isFinite(d) && d >= 0 && d <= 3) ? d : 0;
           }
+		  
+          // Scorekeeper : qui tient les scores (0..3)
+          const sk = parsed.scoreKeeperIndex;
+          parsed.scoreKeeperIndex = (typeof sk === 'number' && Number.isFinite(sk) && sk >= 0 && sk <= 3) ? sk : 0;
 		  
           return parsed;
         }catch(e){
@@ -1227,6 +1232,46 @@
         const chars = Array.from(compact);
         return chars.slice(0,2).join('') || '--';
       }
+	  
+      // Placement : équipes en diagonale + choix de l'équipe "Nous"
+      function isDiagA(seatIdx){
+        return seatIdx === 0 || seatIdx === 3; // J1+J4
+      }
+
+      function getTeamsFromPlacement(players, scoreKeeperIndex){
+        const p = normalizePlayers(players);
+        const sk =
+          (typeof scoreKeeperIndex === 'number' && Number.isFinite(scoreKeeperIndex) && scoreKeeperIndex >= 0 && scoreKeeperIndex <= 3)
+            ? scoreKeeperIndex
+            : 0;
+
+        const diagA = [p[0], p[3]]; // J1+J4
+        const diagB = [p[1], p[2]]; // J2+J3
+
+        if(isDiagA(sk)){
+          return { nous: diagA, eux: diagB, nousSeats: 'J1+J4', euxSeats: 'J2+J3' };
+        }
+        return { nous: diagB, eux: diagA, nousSeats: 'J2+J3', euxSeats: 'J1+J4' };
+      }
+
+      function swapToursNousEux(){
+        const keys = Object.keys(state.tours || {});
+        for(const k of keys){
+          const t = state.tours[k];
+          if(!t) continue;
+
+          if(t.points){
+            const tmp = t.points.Nous;
+            t.points.Nous = t.points.Eux;
+            t.points.Eux = tmp;
+          }
+
+          if(t.contract && t.contract.team){
+            if(t.contract.team === 'Nous') t.contract.team = 'Eux';
+            else if(t.contract.team === 'Eux') t.contract.team = 'Nous';
+          }
+        }
+      }
 
       function dealerIndexForTour(tour){
         const anchorTour =
@@ -1281,17 +1326,22 @@
       }
 
       function pushHistory(label){
-        state.undo.push({ snapshot: deepClone({tours: state.tours}), label, at: nowISO() });
+        state.undo.push({ snapshot: deepClone({tours: state.tours, scoreKeeperIndex: state.scoreKeeperIndex}), label, at: nowISO() });
         if(state.undo.length > MAX_HISTORY) state.undo.shift();
-        state.redo = [];
-        saveState();
+        state.redo = []; // invalide la redo dès qu’on fait une nouvelle action
       }
 
       function doUndo(){
         const last = state.undo.pop();
         if(!last) return;
-        state.redo.push({ snapshot: deepClone({tours: state.tours}), label: last.label, at: nowISO() });
-        state.tours = last.snapshot.tours || {};
+        state.redo.push({ snapshot: deepClone({tours: state.tours, scoreKeeperIndex: state.scoreKeeperIndex}), label: last.label, at: nowISO() });
+
+        const snap = last.snapshot || {};
+        state.tours = snap.tours || {};
+        if(typeof snap.scoreKeeperIndex === 'number' && Number.isFinite(snap.scoreKeeperIndex) && snap.scoreKeeperIndex >= 0 && snap.scoreKeeperIndex <= 3){
+          state.scoreKeeperIndex = snap.scoreKeeperIndex;
+        }
+
         saveState();
         renderAll();
       }
@@ -1299,9 +1349,15 @@
       function doRedo(){
         const last = state.redo.pop();
         if(!last) return;
-        state.undo.push({ snapshot: deepClone({tours: state.tours}), label: last.label, at: nowISO() });
+        state.undo.push({ snapshot: deepClone({tours: state.tours, scoreKeeperIndex: state.scoreKeeperIndex}), label: last.label, at: nowISO() });
         if(state.undo.length > MAX_HISTORY) state.undo.shift();
-        state.tours = last.snapshot.tours || {};
+
+        const snap = last.snapshot || {};
+        state.tours = snap.tours || {};
+        if(typeof snap.scoreKeeperIndex === 'number' && Number.isFinite(snap.scoreKeeperIndex) && snap.scoreKeeperIndex >= 0 && snap.scoreKeeperIndex <= 3){
+          state.scoreKeeperIndex = snap.scoreKeeperIndex;
+        }
+
         saveState();
         renderAll();
       }
@@ -2136,9 +2192,10 @@
         lines.push('players.j3 : ' + p[2]);
         lines.push('players.j4 : ' + p[3]);
 
-        // Equipes (diagonales)
-        lines.push('teams.nous : J1+J3 = ' + p[0] + ' + ' + p[2]);
-        lines.push('teams.eux : J2+J4 = ' + p[1] + ' + ' + p[3]);
+        // Equipes (diagonales) + choix de Nous via "Qui tient les scores ?"
+        const teams = getTeamsFromPlacement(state.players, state.scoreKeeperIndex);
+        lines.push('teams.nous : ' + teams.nousSeats + ' = ' + teams.nous[0] + ' + ' + teams.nous[1]);
+        lines.push('teams.eux : ' + teams.euxSeats + ' = ' + teams.eux[0] + ' + ' + teams.eux[1]);
 
         // Resultat + tours
         const cur = currentTour();
@@ -2986,6 +3043,16 @@
                 <label class="label" for="plDealer">Qui donne ?</label>
                 <select id="plDealer"></select>
               </div>
+
+              <div class="field" style="margin-top:12px;">
+                <label class="label" for="plScorekeeper">Qui tient les scores ?</label>
+                <select id="plScorekeeper"></select>
+                <div id="plTeamsNous" style="margin-top:8px; font-weight:900; color: rgb(var(--blue-rgb));"></div>
+                <div id="plTeamsEux" style="margin-top:4px; font-weight:900; color: rgb(var(--red-rgb));"></div>
+              </div>
+
+              <div class="miniLabel" id="plLockHint" style="margin-top:10px; display:none;">Placement verrouillé : nouvelle partie pour changer.</div>
+			  
             </div>
           </div>
 
@@ -3041,7 +3108,11 @@
         const pl4Other = document.getElementById('pl4Other');
 
         const plDealer = document.getElementById('plDealer');
-
+        const plScorekeeper = document.getElementById('plScorekeeper');
+        const plTeamsNous = document.getElementById('plTeamsNous');
+        const plTeamsEux = document.getElementById('plTeamsEux');
+        const plLockHint = document.getElementById('plLockHint');
+		
         function setOtherVisibility(sel, other){
           if(!sel || !other) return;
           other.style.display = (sel.value === OTHER_VALUE) ? 'block' : 'none';
@@ -3069,6 +3140,142 @@
           plDealer.value = String(next);
         }
 
+        // Placement : permutation automatique (swap) si tu choisis un prénom déjà pris
+        function applyPlacementUIFromState(){
+          const seats = [
+            {sel: pl1Sel, other: pl1Other, fallback: PRESET_PLAYERS[0]},
+            {sel: pl2Sel, other: pl2Other, fallback: PRESET_PLAYERS[1]},
+            {sel: pl3Sel, other: pl3Other, fallback: PRESET_PLAYERS[2]},
+            {sel: pl4Sel, other: pl4Other, fallback: PRESET_PLAYERS[3]},
+          ];
+
+          state.players = normalizePlayers(state.players);
+
+          for(let i=0; i<seats.length; i++){
+            const seat = seats[i];
+            if(!seat.sel) continue;
+
+            const name = state.players[i] || seat.fallback;
+
+            if(PRESET_PLAYERS.includes(name)){
+              seat.sel.value = name;
+              if(seat.other){
+                seat.other.value = '';
+                seat.other.style.display = 'none';
+              }
+            }else{
+              seat.sel.value = OTHER_VALUE;
+              if(seat.other){
+                seat.other.style.display = 'block';
+                seat.other.value = name;
+              }
+            }
+          }
+        }
+
+        function swapSeatLinkedIndices(i, j){
+          // Donneur : on garde le même joueur, même s'il change de slot
+          if(typeof state.dealerAnchorIndex === 'number' && Number.isFinite(state.dealerAnchorIndex)){
+            if(state.dealerAnchorIndex === i) state.dealerAnchorIndex = j;
+            else if(state.dealerAnchorIndex === j) state.dealerAnchorIndex = i;
+          }
+
+          // Scorekeeper : on garde le même joueur (donc la même équipe "Nous")
+          if(typeof state.scoreKeeperIndex === 'number' && Number.isFinite(state.scoreKeeperIndex)){
+            if(state.scoreKeeperIndex === i) state.scoreKeeperIndex = j;
+            else if(state.scoreKeeperIndex === j) state.scoreKeeperIndex = i;
+          }
+        }
+
+        function tryAutoSwapPlacement(changedIdx, pickedName){
+          // On swap uniquement pour les prénoms "preset"
+          if(!PRESET_PLAYERS.includes(pickedName)) return false;
+
+          state.players = normalizePlayers(state.players);
+
+          const otherIdx = state.players.findIndex((n, idx) => (idx !== changedIdx) && (n === pickedName));
+          if(otherIdx < 0) return false;
+
+          // swap joueurs
+          const tmp = state.players[changedIdx];
+          state.players[changedIdx] = state.players[otherIdx];
+          state.players[otherIdx] = tmp;
+
+          // garder le même donneur / scorekeeper (par personne)
+          swapSeatLinkedIndices(changedIdx, otherIdx);
+
+          saveState();
+
+          // UI
+          applyPlacementUIFromState();
+
+          // IMPORTANT : aligne les 2 selects avec l'état après swap (sinon ils “gardent” l'ancien index)
+          if(plDealer) plDealer.value = String(state.dealerAnchorIndex);
+          if(plScorekeeper) plScorekeeper.value = String(state.scoreKeeperIndex);
+
+          rebuildDealerOptions();
+          rebuildScorekeeperOptions();
+          renderDealerGrid();
+          renderTeamsHint();
+
+          return true;
+        }
+
+        function onPlacementSelectChange(idx, sel, other){
+          if(!sel) return;
+
+          const v = sel.value;
+
+          // Si ce prénom est déjà pris ailleurs : permutation automatique
+          if(v !== OTHER_VALUE && tryAutoSwapPlacement(idx, v)) return;
+
+          // Sinon : comportement normal
+          setOtherVisibility(sel, other);
+          syncPlayersFromUI();
+        }
+
+        function fixDuplicatePresetSelections(){
+          const sels = [pl1Sel, pl2Sel, pl3Sel, pl4Sel].filter(Boolean);
+          const vals = sels.map(s => s.value);
+          const used = new Set();
+          const missing = PRESET_PLAYERS.filter(n => !vals.includes(n));
+          let mi = 0;
+          for(const sel of sels){
+            const v = sel.value;
+            if(!PRESET_PLAYERS.includes(v)) continue;
+            if(used.has(v)){
+              sel.value = missing[mi] ? missing[mi] : OTHER_VALUE;
+              mi++;
+            }else{
+              used.add(v);
+            }
+          }
+        }
+
+        function rebuildScorekeeperOptions(){
+          if(!plScorekeeper) return;
+          const keep = parseIntSafe(plScorekeeper.value);
+
+          plScorekeeper.innerHTML = state.players.map((name, idx) =>
+            `<option value="${idx}">${escapeHtml(name)}</option>`
+          ).join('');
+
+          const sk0 =
+            (typeof state.scoreKeeperIndex === 'number' && Number.isFinite(state.scoreKeeperIndex) && state.scoreKeeperIndex >= 0 && state.scoreKeeperIndex <= 3)
+              ? state.scoreKeeperIndex
+              : 0;
+
+          const next = (keep !== null && keep >= 0 && keep <= 3) ? keep : sk0;
+          plScorekeeper.value = String(next);
+        }
+
+        function renderTeamsHint(){
+          if(!plTeamsNous || !plTeamsEux) return;
+          const teams = getTeamsFromPlacement(state.players, state.scoreKeeperIndex);
+          plTeamsNous.textContent = `Nous = ${teams.nous[0]} et ${teams.nous[1]}`;
+          plTeamsEux.textContent = `Eux = ${teams.eux[0]} et ${teams.eux[1]}`;
+        }
+
         function syncPlayersFromUI(){
           state.players = [
             seatName(pl1Sel, pl1Other, PRESET_PLAYERS[0]),
@@ -3076,15 +3283,37 @@
             seatName(pl3Sel, pl3Other, PRESET_PLAYERS[2]),
             seatName(pl4Sel, pl4Other, PRESET_PLAYERS[3]),
           ];
+		  
           saveState();
           rebuildDealerOptions();
+          rebuildScorekeeperOptions();
           renderDealerGrid();
+          renderTeamsHint();
+		  
         }
 
-        if(pl1Sel) pl1Sel.addEventListener('change', () => { setOtherVisibility(pl1Sel, pl1Other); syncPlayersFromUI(); });
-        if(pl2Sel) pl2Sel.addEventListener('change', () => { setOtherVisibility(pl2Sel, pl2Other); syncPlayersFromUI(); });
-        if(pl3Sel) pl3Sel.addEventListener('change', () => { setOtherVisibility(pl3Sel, pl3Other); syncPlayersFromUI(); });
-        if(pl4Sel) pl4Sel.addEventListener('change', () => { setOtherVisibility(pl4Sel, pl4Other); syncPlayersFromUI(); });
+        // Placement : verrouillage pendant la partie
+        const placementLocked = (meaningfulMaxTour() > 0);
+        if(plLockHint) plLockHint.style.display = placementLocked ? 'block' : 'none';
+
+        if(placementLocked){
+          [pl1Sel, pl2Sel, pl3Sel, pl4Sel, pl1Other, pl2Other, pl3Other, pl4Other].forEach(el => {
+            if(el) el.disabled = true;
+          });
+        }else{
+          // Anti-doublons sur les 4 listes (prénoms)
+          fixDuplicatePresetSelections();
+          setOtherVisibility(pl1Sel, pl1Other);
+          setOtherVisibility(pl2Sel, pl2Other);
+          setOtherVisibility(pl3Sel, pl3Other);
+          setOtherVisibility(pl4Sel, pl4Other);
+          syncPlayersFromUI();
+        }
+
+        if(pl1Sel) pl1Sel.addEventListener('change', () => onPlacementSelectChange(0, pl1Sel, pl1Other));
+        if(pl2Sel) pl2Sel.addEventListener('change', () => onPlacementSelectChange(1, pl2Sel, pl2Other));
+        if(pl3Sel) pl3Sel.addEventListener('change', () => onPlacementSelectChange(2, pl3Sel, pl3Other));
+        if(pl4Sel) pl4Sel.addEventListener('change', () => onPlacementSelectChange(3, pl4Sel, pl4Other));
 
         if(pl1Other) pl1Other.addEventListener('input', syncPlayersFromUI);
         if(pl2Other) pl2Other.addEventListener('input', syncPlayersFromUI);
@@ -3103,6 +3332,52 @@
             state.dealerAnchorIndex = (idx !== null && idx >= 0 && idx <= 3) ? idx : 0;
             saveState();
             renderDealerGrid();
+          });
+        }
+		
+        // Scorekeeper : qui tient les scores
+        if(plScorekeeper){
+          rebuildScorekeeperOptions();
+
+          const sk0 =
+            (typeof state.scoreKeeperIndex === 'number' && Number.isFinite(state.scoreKeeperIndex) && state.scoreKeeperIndex >= 0 && state.scoreKeeperIndex <= 3)
+              ? state.scoreKeeperIndex
+              : 0;
+
+          plScorekeeper.value = String(sk0);
+          renderTeamsHint();
+
+          plScorekeeper.addEventListener('change', () => {
+            const oldIdx =
+              (typeof state.scoreKeeperIndex === 'number' && Number.isFinite(state.scoreKeeperIndex) && state.scoreKeeperIndex >= 0 && state.scoreKeeperIndex <= 3)
+                ? state.scoreKeeperIndex
+                : 0;
+
+            const n = parseIntSafe(plScorekeeper.value);
+            const nextIdx = (n !== null && n >= 0 && n <= 3) ? n : 0;
+
+            const started = (meaningfulMaxTour() > 0);
+            const changedDiag = isDiagA(oldIdx) !== isDiagA(nextIdx);
+
+            if(started && changedDiag){
+              const ok = confirm('Ça inverse Nous/Eux sur tout l’historique. Tu confirmes ?');
+              if(!ok){
+                plScorekeeper.value = String(oldIdx);
+                return;
+              }
+              pushHistory('Inversion Nous/Eux');
+              state.scoreKeeperIndex = nextIdx;
+              swapToursNousEux();
+              saveState();
+              renderAll();
+              renderPanelAutres();
+              renderTeamsHint();
+              return;
+            }
+
+            state.scoreKeeperIndex = nextIdx;
+            saveState();
+            renderTeamsHint();
           });
         }
 
