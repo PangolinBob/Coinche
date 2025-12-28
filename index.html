@@ -149,6 +149,27 @@
       max-width: 720px;
       margin: 0 auto;
     }
+	
+    /* Export view */
+    #exportView{
+      width: 100%;
+      max-width: 720px;
+      margin: 0 auto;
+    }
+    #exportText{
+      width: 100%;
+      height: min(520px, 52vh);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 10px 12px;
+      background: #fafafa;
+      color: #111;
+      resize: none;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      line-height: 1.25;
+      font-variant-numeric: tabular-nums;
+    }
+	
     .statsCard{
       width: 100%;
       border-radius: 14px;
@@ -932,7 +953,7 @@
     }
 
     /* Reduce accidental zoom on iOS when focusing inputs */
-    input, select, button{ font-size: 16px; }
+    input, select, button, textarea{ font-size: 16px; }
   </style>
   
   <script>
@@ -996,6 +1017,19 @@
           <div class="statsBody" id="statsBody"></div>
         </div>
       </div>
+	  
+      <div id="exportView" style="display:none;" aria-label="Export">
+        <div class="statsCard">
+          <div class="statsHeader">
+            <div class="statsTitle">Export</div>
+            <button class="close" id="exportClose" aria-label="Fermer">✕</button>
+          </div>
+          <div class="statsBody" id="exportBody">
+            <textarea id="exportText" readonly spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off"></textarea>
+            <button class="primary" id="exportCopy">Copier</button>
+          </div>
+        </div>
+      </div>	  
 	  
     </main>
 
@@ -1313,7 +1347,10 @@
       const elStatsView = document.getElementById('statsView');
       const elStatsClose = document.getElementById('statsClose');
       const elStatsBody = document.getElementById('statsBody');
-	  
+      const elExportView = document.getElementById('exportView');
+      const elExportClose = document.getElementById('exportClose');
+      const elExportText = document.getElementById('exportText');
+      const elExportCopy = document.getElementById('exportCopy');
       const elSheet = document.querySelector('#sheetView .sheet');
       const elSheetHeader = document.querySelector('#sheetView .sheetHeader');
 
@@ -1325,6 +1362,7 @@
 	  
       let showingGraph = false;
       let showingStats = false;
+      let showingExport = false;
       let placementOpen = false;
 	  
       // -------- Accueil (home screen) ----------
@@ -1343,6 +1381,7 @@
         // Toujours revenir sur la feuille de score
         showingGraph = false;
         showingStats = false;
+        showingExport = false;
         closePanel();
         renderAll();
       }
@@ -1368,6 +1407,17 @@
         showingStats = false;
         renderAll();
       });
+	  
+      if(elExportClose){
+        elExportClose.addEventListener('click', () => {
+          showingExport = false;
+          renderAll();
+        });
+      }
+
+      if(elExportCopy){
+        elExportCopy.addEventListener('click', () => copyExportToClipboard());
+      }	  
 
       function renderAll(){
         const cur = currentTour();
@@ -1375,16 +1425,25 @@
         if(showingGraph){
           elSheetView.style.display = 'none';
           elStatsView.style.display = 'none';
+          if(elExportView) elExportView.style.display = 'none';
           elGraphView.style.display = 'block';
           renderGraph();
         }else if(showingStats){
           elSheetView.style.display = 'none';
           elGraphView.style.display = 'none';
+          if(elExportView) elExportView.style.display = 'none';
           elStatsView.style.display = 'block';
           renderStats();
+        }else if(showingExport){
+          elSheetView.style.display = 'none';
+          elGraphView.style.display = 'none';
+          elStatsView.style.display = 'none';
+          if(elExportView) elExportView.style.display = 'block';
+          renderExport();
         }else{
           elGraphView.style.display = 'none';
           elStatsView.style.display = 'none';
+          if(elExportView) elExportView.style.display = 'none';
           elSheetView.style.display = 'block';
           renderSheet();
           syncSheetHeaderSpace();
@@ -2014,6 +2073,378 @@
           
         `;
       }
+	  
+      // -------- Export ----------
+      function exportFmt(v){
+        if(v === null || v === undefined) return '—';
+        return String(v);
+      }
+
+      function exportNum(n){
+        return isFiniteNumber(n) ? String(n) : '—';
+      }
+
+      function exportPct(p){
+        return (p === null || p === undefined) ? '—' : String(p);
+      }
+
+      function exportWinner(diff){
+        if(!isFiniteNumber(diff)) return '—';
+        if(diff > 0) return 'Nous';
+        if(diff < 0) return 'Eux';
+        return 'Egalite';
+      }
+
+      function meaningfulMaxTour(){
+        const keys = Object.keys(state.tours || {});
+        let m = 0;
+        for(const k of keys){
+          const n = parseIntSafe(k);
+          if(!n) continue;
+          const t = state.tours[k];
+          const hasContract = !!(t && t.contract);
+          const hasPts = !!(t && t.points && (isFiniteNumber(t.points.Nous) || isFiniteNumber(t.points.Eux)));
+          if(hasContract || hasPts){
+            if(n > m) m = n;
+          }
+        }
+        return m;
+      }
+
+      function buildExportText(){
+        // Normalise noms
+        state.players = normalizePlayers(state.players);
+        const p = state.players;
+
+        const lines = [];
+        lines.push('COINCHE EXPORT v1');
+
+        lines.push('meta.exported_at_iso : ' + nowISO());
+        lines.push('meta.schema : v1');
+        lines.push('meta.export_type : canonical');
+        lines.push('meta.usage : coller ce bloc dans le projet Coinche apres /info ou /image');
+
+        // Photos
+        lines.push('photos.photo_j1 : ' + p[0] + '.png');
+        lines.push('photos.photo_j2 : ' + p[1] + '.png');
+        lines.push('photos.photo_j3 : ' + p[2] + '.png');
+        lines.push('photos.photo_j4 : ' + p[3] + '.png');
+
+        // Joueurs
+        lines.push('players.j1 : ' + p[0]);
+        lines.push('players.j2 : ' + p[1]);
+        lines.push('players.j3 : ' + p[2]);
+        lines.push('players.j4 : ' + p[3]);
+
+        // Equipes (diagonales)
+        lines.push('teams.nous : J1+J3 = ' + p[0] + ' + ' + p[2]);
+        lines.push('teams.eux : J2+J4 = ' + p[1] + ' + ' + p[3]);
+
+        // Resultat + tours
+        const cur = currentTour();
+        const last = Math.max(0, cur - 1);
+        const totals = computeRunningTotals(last);
+
+        let totalNous = 0, totalEux = 0;
+        if(last >= 1 && totals[last] && totals[last].computed){
+          totalNous = totals[last].Nous;
+          totalEux = totals[last].Eux;
+        }
+        const diff = totalNous - totalEux;
+
+        lines.push('result.tour_courant : ' + exportNum(cur));
+        lines.push('result.tours_valides : ' + exportNum(last));
+        lines.push('result.score_final.nous : ' + exportNum(totalNous));
+        lines.push('result.score_final.eux : ' + exportNum(totalEux));
+        lines.push('result.ecart : ' + exportNum(diff));
+        lines.push('result.vainqueur : ' + exportWinner(diff));
+
+        // Stats (miroir de l'ecran Statistiques)
+        const hasTours = last >= 1;
+
+        // Leader changes
+        let leaderChanges = null;
+        if(last >= 2){
+          let prev = null;
+          let changes = 0;
+          for(let i=1; i<=last; i++){
+            const tot = totals[i];
+            if(!tot || !tot.computed) break;
+            let lead = null;
+            if(tot.Nous > tot.Eux) lead = 'Nous';
+            else if(tot.Eux > tot.Nous) lead = 'Eux';
+            if(lead && prev && lead !== prev) changes++;
+            if(lead) prev = lead;
+          }
+          leaderChanges = changes;
+        }
+
+        // Points par tour (best/worst + swing)
+        let bestNous = null, worstNous = null, bestEux = null, worstEux = null;
+        let maxSwing = null;
+
+        for(let i=1; i<=last; i++){
+          const t = state.tours[String(i)];
+          if(!t || !t.points) continue;
+          const pn = t.points.Nous;
+          const pe = t.points.Eux;
+          if(!isFiniteNumber(pn) || !isFiniteNumber(pe)) continue;
+
+          if(!bestNous || pn > bestNous.val) bestNous = {val: pn, tour: i};
+          if(!worstNous || pn < worstNous.val) worstNous = {val: pn, tour: i};
+          if(!bestEux || pe > bestEux.val) bestEux = {val: pe, tour: i};
+          if(!worstEux || pe < worstEux.val) worstEux = {val: pe, tour: i};
+
+          const d = pn - pe;
+          const abs = Math.abs(d);
+          if(!maxSwing || abs > maxSwing.abs){
+            const win = d > 0 ? 'Nous' : d < 0 ? 'Eux' : 'Egalite';
+            maxSwing = {abs, tour: i, win, d};
+          }
+        }
+
+        let lastSwingText = '—';
+        if(hasTours){
+          const t = state.tours[String(last)];
+          if(t && t.points && isFiniteNumber(t.points.Nous) && isFiniteNumber(t.points.Eux)){
+            const d = t.points.Nous - t.points.Eux;
+            if(d > 0) lastSwingText = `+${d} Nous`;
+            else if(d < 0) lastSwingText = `+${(-d)} Eux`;
+            else lastSwingText = '0';
+          }
+        }
+
+        const avgNous = hasTours ? Math.round(totalNous / last) : null;
+        const avgEux  = hasTours ? Math.round(totalEux  / last) : null;
+
+        // Contrats + couleurs + rares
+        const cCount = {Nous:0, Eux:0};
+        const cOK = {Nous:0, Eux:0};
+        const cFail = {Nous:0, Eux:0};
+        const cSum = {Nous:0, Eux:0};
+        const cC = {Nous:0, Eux:0};
+        const cSC = {Nous:0, Eux:0};
+
+        const suitsCount = {
+          Nous: {spade:0, club:0, heart:0, diamond:0, none:0},
+          Eux:  {spade:0, club:0, heart:0, diamond:0, none:0},
+        };
+
+        let maxContract = null; // {target, team, tour, contract}
+        let lastCap = null, lastGen = null, lastC = null, lastSC = null;
+
+        for(let i=1; i<=last; i++){
+          const t = state.tours[String(i)];
+          const c = t && t.contract ? t.contract : null;
+          if(!c || !c.team) continue;
+
+          const team = (c.team === 'Eux') ? 'Eux' : 'Nous';
+          const target = contractTargetPoints(c);
+
+          cCount[team]++;
+
+          if(isFiniteNumber(target)){
+            cSum[team] += target;
+            if(!maxContract || target > maxContract.target){
+              maxContract = {target, team, tour: i, contract: c};
+            }
+          }
+
+          const ptsTeam = t && t.points ? t.points[team] : null;
+          if(isFiniteNumber(target) && isFiniteNumber(ptsTeam)){
+            if(ptsTeam >= target) cOK[team]++; else cFail[team]++;
+          }
+
+          if(c.coinche === 'SC'){ cSC[team]++; lastSC = {team, tour: i, contract: c}; }
+          else if(c.coinche === 'C'){ cC[team]++; lastC = {team, tour: i, contract: c}; }
+
+          if(c.kind === 'cap') lastCap = {team, tour: i, contract: c};
+          if(c.kind === 'gen') lastGen = {team, tour: i, contract: c};
+
+          const suit = (c.suit || 'none');
+          const sid = (suitsCount[team][suit] !== undefined) ? suit : 'none';
+          suitsCount[team][sid]++;
+        }
+
+        const anyContracts = (cCount.Nous + cCount.Eux) > 0;
+
+        function pct(ok, total){
+          if(total <= 0) return null;
+          return Math.round((ok / total) * 100);
+        }
+
+        const pNous = pct(cOK.Nous, cCount.Nous);
+        const pEux  = pct(cOK.Eux,  cCount.Eux);
+
+        const avgCNous = cCount.Nous > 0 ? Math.round(cSum.Nous / cCount.Nous) : null;
+        const avgCEux  = cCount.Eux  > 0 ? Math.round(cSum.Eux  / cCount.Eux)  : null;
+
+        // Exports: Resume
+        lines.push('stats.resume.tours_valides : ' + exportNum(last));
+        lines.push('stats.resume.tour_courant : ' + exportNum(cur));
+        lines.push('stats.resume.total_nous : ' + exportNum(totalNous));
+        lines.push('stats.resume.total_eux : ' + exportNum(totalEux));
+        lines.push('stats.resume.diff_nous_moins_eux : ' + exportNum(diff));
+        lines.push('stats.resume.leader_changes : ' + exportFmt(leaderChanges === null ? '—' : leaderChanges));
+
+        // Rythme
+        lines.push('stats.rythme.avg_nous_par_tour : ' + exportPct(avgNous));
+        lines.push('stats.rythme.avg_eux_par_tour : ' + exportPct(avgEux));
+        lines.push('stats.rythme.best_nous.val : ' + exportFmt(bestNous ? bestNous.val : '—'));
+        lines.push('stats.rythme.best_nous.tour : ' + exportFmt(bestNous ? bestNous.tour : '—'));
+        lines.push('stats.rythme.worst_nous.val : ' + exportFmt(worstNous ? worstNous.val : '—'));
+        lines.push('stats.rythme.worst_nous.tour : ' + exportFmt(worstNous ? worstNous.tour : '—'));
+        lines.push('stats.rythme.best_eux.val : ' + exportFmt(bestEux ? bestEux.val : '—'));
+        lines.push('stats.rythme.best_eux.tour : ' + exportFmt(bestEux ? bestEux.tour : '—'));
+        lines.push('stats.rythme.worst_eux.val : ' + exportFmt(worstEux ? worstEux.val : '—'));
+        lines.push('stats.rythme.worst_eux.tour : ' + exportFmt(worstEux ? worstEux.tour : '—'));
+        lines.push('stats.rythme.dernier_tour_swing : ' + exportFmt(lastSwingText));
+
+        // Contrats
+        lines.push('stats.contrats.nous.annonces : ' + exportFmt(hasTours ? cCount.Nous : '—'));
+        lines.push('stats.contrats.eux.annonces : ' + exportFmt(hasTours ? cCount.Eux : '—'));
+        lines.push('stats.contrats.nous.reussite_pct : ' + exportFmt(pNous === null ? '—' : pNous));
+        lines.push('stats.contrats.eux.reussite_pct : ' + exportFmt(pEux === null ? '—' : pEux));
+        lines.push('stats.contrats.nous.moyenne : ' + exportFmt(avgCNous === null ? '—' : avgCNous));
+        lines.push('stats.contrats.eux.moyenne : ' + exportFmt(avgCEux === null ? '—' : avgCEux));
+        lines.push('stats.contrats.nous.rates : ' + exportFmt(hasTours ? cFail.Nous : '—'));
+        lines.push('stats.contrats.eux.rates : ' + exportFmt(hasTours ? cFail.Eux : '—'));
+        lines.push('stats.contrats.coinches.nous : ' + exportFmt(hasTours ? cC.Nous : '—'));
+        lines.push('stats.contrats.coinches.eux : ' + exportFmt(hasTours ? cC.Eux : '—'));
+        lines.push('stats.contrats.surcoinches.nous : ' + exportFmt(hasTours ? cSC.Nous : '—'));
+        lines.push('stats.contrats.surcoinches.eux : ' + exportFmt(hasTours ? cSC.Eux : '—'));
+
+        // Couleurs annoncees
+        const suitVal = (team, suitId) => anyContracts ? String(suitsCount[team][suitId]) : '—';
+        lines.push('stats.couleurs.nous.spade : ' + suitVal('Nous','spade'));
+        lines.push('stats.couleurs.nous.club : ' + suitVal('Nous','club'));
+        lines.push('stats.couleurs.nous.heart : ' + suitVal('Nous','heart'));
+        lines.push('stats.couleurs.nous.diamond : ' + suitVal('Nous','diamond'));
+        lines.push('stats.couleurs.nous.none : ' + suitVal('Nous','none'));
+        lines.push('stats.couleurs.eux.spade : ' + suitVal('Eux','spade'));
+        lines.push('stats.couleurs.eux.club : ' + suitVal('Eux','club'));
+        lines.push('stats.couleurs.eux.heart : ' + suitVal('Eux','heart'));
+        lines.push('stats.couleurs.eux.diamond : ' + suitVal('Eux','diamond'));
+        lines.push('stats.couleurs.eux.none : ' + suitVal('Eux','none'));
+
+        // Champagne
+        lines.push('stats.champagne.max_contrat.team : ' + exportFmt(maxContract ? maxContract.team : '—'));
+        lines.push('stats.champagne.max_contrat.tour : ' + exportFmt(maxContract ? maxContract.tour : '—'));
+        lines.push('stats.champagne.max_contrat.contract.team : ' + exportFmt(maxContract && maxContract.contract ? maxContract.contract.team : '—'));
+        lines.push('stats.champagne.max_contrat.contract.kind : ' + exportFmt(maxContract && maxContract.contract ? maxContract.contract.kind : '—'));
+        lines.push('stats.champagne.max_contrat.contract.value : ' + exportFmt((maxContract && maxContract.contract && maxContract.contract.kind === 'number') ? maxContract.contract.value : '—'));
+        lines.push('stats.champagne.max_contrat.contract.suit : ' + exportFmt(maxContract && maxContract.contract ? (maxContract.contract.suit || 'none') : '—'));
+        lines.push('stats.champagne.max_contrat.contract.coinche : ' + exportFmt((maxContract && maxContract.contract && maxContract.contract.coinche && maxContract.contract.coinche !== 'none') ? maxContract.contract.coinche : '—'));
+
+        lines.push('stats.champagne.swing_max.abs : ' + exportFmt(maxSwing ? maxSwing.abs : '—'));
+        lines.push('stats.champagne.swing_max.win : ' + exportFmt(maxSwing ? maxSwing.win : '—'));
+        lines.push('stats.champagne.swing_max.tour : ' + exportFmt(maxSwing ? maxSwing.tour : '—'));
+
+        // Extra champagne (priorite SC > C > GEN > CAP > meilleur tour)
+        let extraType = '—', extraTeam = '—', extraTour = '—', extraContract = null, extraBest = null;
+        if(lastSC){ extraType = 'surcoinche'; extraTeam = lastSC.team; extraTour = lastSC.tour; extraContract = lastSC.contract; }
+        else if(lastC){ extraType = 'coinche'; extraTeam = lastC.team; extraTour = lastC.tour; extraContract = lastC.contract; }
+        else if(lastGen){ extraType = 'gen'; extraTeam = lastGen.team; extraTour = lastGen.tour; extraContract = lastGen.contract; }
+        else if(lastCap){ extraType = 'cap'; extraTeam = lastCap.team; extraTour = lastCap.tour; extraContract = lastCap.contract; }
+        else{
+          const bestOverall =
+            (bestNous && bestEux)
+              ? (bestNous.val >= bestEux.val ? {team:'Nous', val:bestNous.val, tour:bestNous.tour}
+                                            : {team:'Eux',  val:bestEux.val,  tour:bestEux.tour})
+              : (bestNous ? {team:'Nous', val:bestNous.val, tour:bestNous.tour}
+                         : (bestEux ? {team:'Eux', val:bestEux.val, tour:bestEux.tour} : null));
+          if(bestOverall){
+            extraType = 'meilleur_tour';
+            extraBest = bestOverall;
+          }
+        }
+
+        lines.push('stats.champagne.extra.type : ' + exportFmt(extraType));
+        lines.push('stats.champagne.extra.team : ' + exportFmt(extraBest ? extraBest.team : extraTeam));
+        lines.push('stats.champagne.extra.tour : ' + exportFmt(extraBest ? extraBest.tour : extraTour));
+
+        lines.push('stats.champagne.extra.contract.kind : ' + exportFmt(extraContract ? extraContract.kind : '—'));
+        lines.push('stats.champagne.extra.contract.value : ' + exportFmt((extraContract && extraContract.kind === 'number') ? extraContract.value : '—'));
+        lines.push('stats.champagne.extra.contract.suit : ' + exportFmt(extraContract ? (extraContract.suit || 'none') : '—'));
+        lines.push('stats.champagne.extra.contract.coinche : ' + exportFmt((extraContract && extraContract.coinche && extraContract.coinche !== 'none') ? extraContract.coinche : '—'));
+
+        lines.push('stats.champagne.extra.meilleur_tour.val : ' + exportFmt(extraBest ? extraBest.val : '—'));
+        lines.push('stats.champagne.extra.meilleur_tour.team : ' + exportFmt(extraBest ? extraBest.team : '—'));
+        lines.push('stats.champagne.extra.meilleur_tour.tour : ' + exportFmt(extraBest ? extraBest.tour : '—'));
+
+        // Historique complet
+        const maxUsed = meaningfulMaxTour();
+        lines.push('tours.max_used : ' + exportNum(maxUsed));
+
+        const totalsAll = computeRunningTotals(maxUsed);
+        for(let i=1; i<=maxUsed; i++){
+          const t = state.tours[String(i)] || {contract:null, points:{Nous:null,Eux:null}};
+          const c = t.contract;
+
+          lines.push(`tour.${i}.contract.team : ` + exportFmt(c && c.team ? c.team : '—'));
+          lines.push(`tour.${i}.contract.kind : ` + exportFmt(c && c.kind ? c.kind : '—'));
+          lines.push(`tour.${i}.contract.value : ` + exportFmt((c && c.kind === 'number' && isFiniteNumber(c.value)) ? c.value : '—'));
+          lines.push(`tour.${i}.contract.suit : ` + exportFmt(c && c.suit ? c.suit : '—'));
+          lines.push(`tour.${i}.contract.coinche : ` + exportFmt((c && c.coinche && c.coinche !== 'none') ? c.coinche : '—'));
+
+          lines.push(`tour.${i}.points.nous : ` + exportNum(t.points ? t.points.Nous : null));
+          lines.push(`tour.${i}.points.eux : ` + exportNum(t.points ? t.points.Eux : null));
+
+          const tot = totalsAll[i];
+          lines.push(`tour.${i}.total.nous : ` + exportFmt(tot && tot.computed ? tot.Nous : '—'));
+          lines.push(`tour.${i}.total.eux : ` + exportFmt(tot && tot.computed ? tot.Eux : '—'));
+        }
+
+        lines.push('FIN EXPORT');
+        return lines.join('\n');
+      }
+
+      function renderExport(){
+        if(!elExportText) return;
+        elExportText.value = buildExportText();
+        // Revenir en haut
+        try{ elExportText.scrollTop = 0; }catch(e){}
+      }
+
+      async function copyExportToClipboard(){
+        const text = buildExportText();
+
+        // Best effort: API moderne
+        try{
+          if(navigator.clipboard && navigator.clipboard.writeText){
+            await navigator.clipboard.writeText(text);
+            exportCopyFeedback(true);
+            return;
+          }
+        }catch(e){}
+
+        // Fallback: execCommand
+        try{
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.setAttribute('readonly','');
+          ta.style.position = 'fixed';
+          ta.style.left = '-9999px';
+          ta.style.top = '0';
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          ta.setSelectionRange(0, 999999);
+          const ok = document.execCommand('copy');
+          document.body.removeChild(ta);
+          exportCopyFeedback(!!ok);
+          return;
+        }catch(e){
+          exportCopyFeedback(false);
+        }
+      }
+
+      function exportCopyFeedback(ok){
+        if(!elExportCopy) return;
+        const prev = elExportCopy.textContent;
+        elExportCopy.textContent = ok ? 'Copié ✅' : 'Copie impossible';
+        setTimeout(() => { elExportCopy.textContent = prev; }, 900);
+      }
 
       function renderContractFragment(contract){
         const frag = document.createDocumentFragment();
@@ -2565,6 +2996,10 @@
           <div class="field">
             <button class="primary" id="aStats">Statistiques</button>
           </div>
+		  
+          <div class="field">
+            <button class="primary" id="aExport">Export</button>
+          </div>
 
           <div class="field">
             <div class="toggleRow">
@@ -2674,6 +3109,7 @@
         document.getElementById('aGraph').addEventListener('click', () => {
           showingGraph = true;
           showingStats = false;
+		  showingExport = false;
           closePanel();
           renderAll();
         });
@@ -2681,10 +3117,19 @@
         document.getElementById('aStats').addEventListener('click', () => {
           showingStats = true;
           showingGraph = false;
+		  showingExport = false;
           closePanel();
           renderAll();
         });
-
+		
+        document.getElementById('aExport').addEventListener('click', () => {
+          showingExport = true;
+          showingGraph = false;
+          showingStats = false;
+          closePanel();
+          renderAll();
+        });
+		
         // Toggle "Page d’accueil"
         const aHomeToggle = document.getElementById('aHomeToggle');
         if(aHomeToggle){
