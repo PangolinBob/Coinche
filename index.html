@@ -882,6 +882,12 @@
       margin-top: 8px;
       font-weight: 700;
     }
+    .warning{
+      font-size: 13px;
+      color: #9a6b00;
+      margin-top: 8px;
+      font-weight: 700;
+    }
 
     .actionsRow{
       display: grid;
@@ -1380,6 +1386,19 @@
           }
           return i;
         }
+      }
+
+      function firstIncompleteTourBefore(tour){
+        const limit = parseIntSafe(tour);
+        if(!limit || limit <= 1) return null;
+
+        for(let i = 1; i < limit; i++){
+          const t = state.tours[String(i)];
+          const pn = t && t.points ? t.points.Nous : null;
+          const pe = t && t.points ? t.points.Eux : null;
+          if(!(isFiniteNumber(pn) && isFiniteNumber(pe))) return i;
+        }
+        return null;
       }
 
       function maxUsedTour(){
@@ -2668,12 +2687,14 @@
           </div>
 
           <button class="primary" id="cSave">Valider</button>
+          <div class="warning" id="cWarn" style="display:none;"></div>
           <div class="error" id="cError" style="display:none;"></div>
         `;
 
         const cTour = document.getElementById('cTour');
         const cWho = document.getElementById('cWho');
         const cCoinche = document.getElementById('cCoinche');
+        const cWarn = document.getElementById('cWarn');
         const cError = document.getElementById('cError');
         const suitPick = document.getElementById('cSuitPick');
         const kindWrap = document.getElementById('cKind');
@@ -2696,6 +2717,25 @@
           }
           cError.style.display = 'block';
           cError.textContent = msg;
+        }
+
+        function setWarning(msg){
+          if(!msg){
+            cWarn.style.display = 'none';
+            cWarn.textContent = '';
+            return;
+          }
+          cWarn.style.display = 'block';
+          cWarn.textContent = msg;
+        }
+
+        function updateTourWarning(tour){
+          const missingTour = firstIncompleteTourBefore(tour);
+          if(!missingTour){
+            setWarning('');
+            return;
+          }
+          setWarning(`Attention : le tour ${missingTour} n’est pas complet (Nous + Eux).`);
         }
 
         function setSuit(id){
@@ -2757,9 +2797,11 @@
           if(!t || t < 1){
             cTour.value = String(cur);
             prefillContrat(cur);
+            updateTourWarning(cur);
             return;
           }
           prefillContrat(t);
+          updateTourWarning(t);
         });
 
         function prefillContrat(tour){
@@ -2801,6 +2843,7 @@
             setError('Tour invalide.');
             return;
           }
+          updateTourWarning(tour);
 
           const team = cWho.value === 'Eux' ? 'Eux' : 'Nous';
           const coinche = cCoinche.value || 'none';
@@ -2855,6 +2898,7 @@
         // init kind default + suit highlight
         setKind(selectedKind);
         setSuit(selectedSuit);
+        updateTourWarning(cur);
       }
 
       // -------- Panel: Points ----------
@@ -2881,12 +2925,14 @@
           </div>
 
           <button class="primary" id="pSave">Valider</button>
+          <div class="warning" id="pWarn" style="display:none;"></div>
           <div class="error" id="pError" style="display:none;"></div>
         `;
 
         const pTour = document.getElementById('pTour');
         const pWho = document.getElementById('pWho');
         const pValue = document.getElementById('pValue');
+        const pWarn = document.getElementById('pWarn');
         const pError = document.getElementById('pError');
 
         pTour.value = String(cur);
@@ -2903,6 +2949,25 @@
           }
           pError.style.display = 'block';
           pError.textContent = msg;
+        }
+
+        function setWarning(msg){
+          if(!msg){
+            pWarn.style.display = 'none';
+            pWarn.textContent = '';
+            return;
+          }
+          pWarn.style.display = 'block';
+          pWarn.textContent = msg;
+        }
+
+        function updateTourWarning(tour){
+          const missingTour = firstIncompleteTourBefore(tour);
+          if(!missingTour){
+            setWarning('');
+            return;
+          }
+          setWarning(`Attention : le tour ${missingTour} n’est pas complet (Nous + Eux).`);
         }
 		
         function suggestWhoForTour(tour){
@@ -2942,11 +3007,13 @@
             const who = suggestWhoForTour(cur);
             pWho.value = who;
             prefillPoints(cur, who);
+            updateTourWarning(cur);
             return;
           }
           const who = suggestWhoForTour(tour);
           pWho.value = who;
           prefillPoints(tour, who);
+          updateTourWarning(tour);
         });
 
         pWho.addEventListener('change', () => {
@@ -2962,6 +3029,7 @@
             setError('Tour invalide.');
             return;
           }
+          updateTourWarning(tour);
           const team = pWho.value === 'Eux' ? 'Eux' : 'Nous';
           const v = Number.parseInt(String(pValue.value || ''), 10);
           if(!Number.isFinite(v)){
@@ -3000,6 +3068,8 @@
           pValue.select();
 		  
         });
+
+        updateTourWarning(cur);
       }
 
       // -------- Panel: Autres ----------
