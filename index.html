@@ -2686,7 +2686,7 @@
             </select>
           </div>
 
-          <button class="primary" id="cSave">Valider</button>
+          <button class="primary" id="cSave" style="display:none;">Valider</button>
           <div class="warning" id="cWarn" style="display:none;"></div>
           <div class="error" id="cError" style="display:none;"></div>
         `;
@@ -2696,6 +2696,7 @@
         const cCoinche = document.getElementById('cCoinche');
         const cWarn = document.getElementById('cWarn');
         const cError = document.getElementById('cError');
+		const cSave = document.getElementById('cSave');
         const suitPick = document.getElementById('cSuitPick');
         const kindWrap = document.getElementById('cKind');
         const numberWrap = document.getElementById('cNumberWrap');
@@ -2765,6 +2766,19 @@
           }else if(kind === 'cap'){
             toggleSuitPickerDisabled(false);
           }
+		  updateContratSaveVisibility();
+        }
+
+        function hasContratNumberValue(){
+          const raw = String(cValue.value || '').trim();
+          if(raw === '') return false;
+          const v = Number.parseInt(raw, 10);
+          return Number.isFinite(v);
+        }
+
+        function updateContratSaveVisibility(){
+          const shouldShow = selectedKind === 'cap' || selectedKind === 'gen' || hasContratNumberValue();
+          cSave.style.display = shouldShow ? '' : 'none';
         }
 
         function toggleSuitPickerDisabled(disabled){
@@ -2804,6 +2818,8 @@
           updateTourWarning(t);
         });
 
+		cValue.addEventListener('input', updateContratSaveVisibility);
+
         function prefillContrat(tour){
           ensureTour(tour);
           const t = state.tours[String(tour)];
@@ -2833,9 +2849,10 @@
             }
           }
           setError('');
+		  updateContratSaveVisibility();
         }
 
-        document.getElementById('cSave').addEventListener('click', () => {
+        cSave.addEventListener('click', () => {
           setError('');
 
           const tour = parseIntSafe(cTour.value);
@@ -2898,6 +2915,7 @@
         // init kind default + suit highlight
         setKind(selectedKind);
         setSuit(selectedSuit);
+		updateContratSaveVisibility();
         updateTourWarning(cur);
       }
 
