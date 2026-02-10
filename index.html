@@ -1356,22 +1356,32 @@
         }
       }
 
-      function dealerIndexForTour(tour){
-        const anchorTour =
-          (typeof state.dealerAnchorTour === 'number' && Number.isFinite(state.dealerAnchorTour) && state.dealerAnchorTour >= 1)
-            ? state.dealerAnchorTour
-            : 1;
-        const anchorIndex =
-          (typeof state.dealerAnchorIndex === 'number' && Number.isFinite(state.dealerAnchorIndex) && state.dealerAnchorIndex >= 0 && state.dealerAnchorIndex <= 3)
-            ? state.dealerAnchorIndex
-            : 0;
+		function dealerIndexForTour(tour){
+		  const anchorTour =
+			(typeof state.dealerAnchorTour === 'number' && Number.isFinite(state.dealerAnchorTour) && state.dealerAnchorTour >= 1)
+			  ? state.dealerAnchorTour
+			  : 1;
+		  const anchorIndex =
+			(typeof state.dealerAnchorIndex === 'number' && Number.isFinite(state.dealerAnchorIndex) && state.dealerAnchorIndex >= 0 && state.dealerAnchorIndex <= 3)
+			  ? state.dealerAnchorIndex
+			  : 0;
 
-        const t = Number.parseInt(String(tour), 10);
-        if(!Number.isFinite(t) || t < 1) return anchorIndex;
+		  const t = Number.parseInt(String(tour), 10);
+		  if(!Number.isFinite(t) || t < 1) return anchorIndex;
 
-        const delta = t - anchorTour;
-        return ((anchorIndex + delta) % 4 + 4) % 4; // modulo positif
-      }
+		  // Ordre horaire visuel de la grille 2x2 :
+		  // 0 (haut-gauche) -> 1 (haut-droite) -> 3 (bas-droite) -> 2 (bas-gauche)
+		  const CLOCKWISE_ORDER = [0, 1, 3, 2];
+
+		  const anchorPos = CLOCKWISE_ORDER.indexOf(anchorIndex);
+		  const safeAnchorPos = (anchorPos >= 0) ? anchorPos : 0;
+
+		  const delta = t - anchorTour;
+		  const pos = ((safeAnchorPos + delta) % 4 + 4) % 4;
+
+		  return CLOCKWISE_ORDER[pos];
+		}
+
 
       function currentTour(){
         // first tour (starting at 1) where points for both teams are not set
@@ -1655,7 +1665,10 @@
 		const cEux = document.createElement('div');
 		cEux.className = 'contract contractEux';
 
-		if(t.contract && (t.contract.team === 'Nous' || t.contract.team === 'Eux')){
+		if(t.contract && t.contract.kind === 'pass'){
+		  cNous.appendChild(renderContractFragment(t.contract));
+		  cEux.appendChild(renderContractFragment(t.contract));
+		}else if(t.contract && (t.contract.team === 'Nous' || t.contract.team === 'Eux')){
 		  const team = t.contract.team;
 		  const target = contractTargetPoints(t.contract);
 		  const pts = t.points ? t.points[team] : null;
@@ -1680,6 +1693,7 @@
 
           const hasAnyPoints = isFiniteNumber(t.points.Nous) || isFiniteNumber(t.points.Eux);
           const showScores = (i < cur) || (i === cur && hasAnyPoints);
+          const isPassContract = !!(t.contract && t.contract.kind === 'pass');
 
           const tot = totals[i] || {Nous:0,Eux:0,computed:false};
 
@@ -1699,11 +1713,11 @@
 
           const ptsNous = document.createElement('div');
           ptsNous.className = 'tourPts';
-          if(showScores && isFiniteNumber(t.points.Nous)) ptsNous.textContent = formatSigned(t.points.Nous);
+          if(showScores && !isPassContract && isFiniteNumber(t.points.Nous)) ptsNous.textContent = formatSigned(t.points.Nous);
 
           const ptsEux = document.createElement('div');
           ptsEux.className = 'tourPts';
-          if(showScores && isFiniteNumber(t.points.Eux)) ptsEux.textContent = formatSigned(t.points.Eux);
+          if(showScores && !isPassContract && isFiniteNumber(t.points.Eux)) ptsEux.textContent = formatSigned(t.points.Eux);
 
           // pending dot only when scores are visible
           if(showScores && !tot.computed){
@@ -2567,6 +2581,8 @@
         }else if(contract.kind === 'gen'){
           frag.appendChild(document.createTextNode('Gén'));
           frag.appendChild(renderSuitSpan('none'));
+		}else if(contract.kind === 'pass'){
+		  frag.appendChild(document.createTextNode('passe'));
         }else{
           frag.appendChild(document.createTextNode('—'));
         }
@@ -2675,7 +2691,10 @@
             <div id="cNumberWrap" style="margin-top:10px;">
               <input id="cValue" type="number" min="0" step="10" inputmode="numeric" placeholder="000"/>
             </div>
+			<button class="danger" id="cPass" type="button" style="margin-top:10px;">Tout le monde passe</button>
           </div>
+
+
 
           <div class="field">
             <label class="label" for="cCoinche">Coinché</label>
@@ -2697,6 +2716,7 @@
         const cWarn = document.getElementById('cWarn');
         const cError = document.getElementById('cError');
 		const cSave = document.getElementById('cSave');
+		const cPass = document.getElementById('cPass');
         const suitPick = document.getElementById('cSuitPick');
         const kindWrap = document.getElementById('cKind');
         const numberWrap = document.getElementById('cNumberWrap');
@@ -2851,6 +2871,32 @@
           setError('');
 		  updateContratSaveVisibility();
         }
+
+		cPass.addEventListener('click', () => {
+		  setError('');
+
+		  const tour = parseIntSafe(cTour.value);
+		  if(!tour || tour < 1){
+			setError('Tour invalide.');
+			return;
+		  }
+
+		  const existing = state.tours[String(tour)] && state.tours[String(tour)].contract;
+		  if(existing && existing.kind !== 'pass'){
+			setError('Une équipe est déjà partie, il faut supprimer son contrat');
+			return;
+		  }
+
+		  pushHistory(makeUndoLabel('Passe', 'Nous/Eux', tour));
+		  const t = ensureTour(tour);
+		  t.contract = { team: null, kind: 'pass', value: null, suit: 'none', coinche: 'none' };
+		  t.points.Nous = 0;
+		  t.points.Eux = 0;
+
+		  saveState();
+		  renderAll();
+		  closePanel();
+		});
 
         cSave.addEventListener('click', () => {
           setError('');
