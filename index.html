@@ -3111,6 +3111,14 @@
             setError('Entre un nombre de points.');
             return;
           }
+          if(v < 80){
+            setError('Les points doivent être au minimum de 80.');
+            return;
+          }
+          if(v % 10 !== 0){
+            setError('Les points doivent être un multiple de 10.');
+            return;
+          }
 		  
           const before = state.tours[String(tour)];
           const wasComplete = !!(before && before.points && isFiniteNumber(before.points.Nous) && isFiniteNumber(before.points.Eux));
