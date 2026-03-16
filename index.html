@@ -1166,6 +1166,12 @@
       const PRESET_PLAYERS = ['Arnaud','Boris','Gaël','Lionel'];
       const OTHER_VALUE = '__other__';
 
+      function defaultScoreKeeperIndex(players){
+        const arr = Array.isArray(players) ? players : PRESET_PLAYERS;
+        const idx = arr.findIndex((name) => String(name || '').trim() === 'Gaël');
+        return idx >= 0 ? idx : 0;
+      }
+
       const SUITS = [
         {id:'spade',   sym:'♠', cls:'black'},
         {id:'club',    sym:'♣', cls:'black'},
@@ -1183,7 +1189,7 @@
           players: PRESET_PLAYERS.slice(),
           dealerAnchorTour: 1,   // tour à partir duquel on recale le donneur
           dealerAnchorIndex: 0,  // index (0..3) du donneur sur dealerAnchorTour
-          scoreKeeperIndex: 0,  // index (0..3) du joueur qui tient les scores (équipe Nous)
+          scoreKeeperIndex: defaultScoreKeeperIndex(PRESET_PLAYERS),  // index (0..3) du joueur qui tient les scores (équipe Nous)
           tours: {}, // { [n]: { contract: {...}?, points: {Nous:number|null, Eux:number|null} } }
           undo: [],
           redo: []
@@ -1229,7 +1235,9 @@
 		  
           // Scorekeeper : qui tient les scores (0..3)
           const sk = parsed.scoreKeeperIndex;
-          parsed.scoreKeeperIndex = (typeof sk === 'number' && Number.isFinite(sk) && sk >= 0 && sk <= 3) ? sk : 0;
+          parsed.scoreKeeperIndex = (typeof sk === 'number' && Number.isFinite(sk) && sk >= 0 && sk <= 3)
+            ? sk
+            : defaultScoreKeeperIndex(parsed.players);
 		  
           return parsed;
         }catch(e){
