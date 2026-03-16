@@ -3050,10 +3050,13 @@
           const hasNous = isFiniteNumber(pn);
           const hasEux  = isFiniteNumber(pe);
 
-          // Aucun point sur le tour : on prend l’équipe partie (contrat) si dispo
+          // Aucun point sur le tour : proposer l’équipe qui N’A PAS parlé
+          // (inverse de l’équipe avec contrat).
           if(!hasNous && !hasEux){
             const ct = t && t.contract ? t.contract.team : null;
-            return (ct === 'Nous' || ct === 'Eux') ? ct : 'Nous';
+            if(ct === 'Nous') return 'Eux';
+            if(ct === 'Eux') return 'Nous';
+            return 'Nous';
           }
 
           // Un seul côté rempli : on propose l’autre
