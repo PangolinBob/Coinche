@@ -2800,8 +2800,12 @@
         function hasContratNumberValue(){
           const raw = String(cValue.value || '').trim();
           if(raw === '') return false;
+          if(!/^\d+$/.test(raw)) return false;
           const v = Number.parseInt(raw, 10);
-          return Number.isFinite(v);
+          if(!Number.isFinite(v)) return false;
+          if(v < 80) return false;
+          if(v % 10 !== 0) return false;
+          return true;
         }
 
         function updateContratSaveVisibility(){
