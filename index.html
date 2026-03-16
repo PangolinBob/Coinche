@@ -2927,6 +2927,14 @@
               setError('Entre un nombre de points.');
               return;
             }
+            if(v < 80){
+              setError('Les points doivent être au minimum de 80.');
+              return;
+            }
+            if(v % 10 !== 0){
+              setError('Les points doivent être un multiple de 10.');
+              return;
+            }
             if(selectedSuit === 'none'){
               setError('Choisis une couleur (sauf générale).');
               return;
@@ -3109,14 +3117,6 @@
           const v = Number.parseInt(String(pValue.value || ''), 10);
           if(!Number.isFinite(v)){
             setError('Entre un nombre de points.');
-            return;
-          }
-          if(v < 80){
-            setError('Les points doivent être au minimum de 80.');
-            return;
-          }
-          if(v % 10 !== 0){
-            setError('Les points doivent être un multiple de 10.');
             return;
           }
 		  
