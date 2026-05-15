@@ -895,6 +895,74 @@
       gap: 10px;
       margin-top: 8px;
     }
+    .voiceButton{
+      width: 100%;
+      height: 48px;
+      border-radius: 14px;
+      border: 1px solid rgba(0,0,0,.18);
+      background: #fff;
+      color: #111;
+      font-size: 16px;
+      font-weight: 900;
+      touch-action: manipulation;
+    }
+    .voiceBox{
+      margin-top: 12px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+    }
+    .voiceBox[hidden]{
+      display: none;
+    }
+    .voiceTitle{
+      font-size: 14px;
+      font-weight: 900;
+      color: var(--fg);
+    }
+    .voiceResult{
+      min-height: 20px;
+      margin-top: 8px;
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--muted);
+    }
+    .voiceResult.ok{
+      color: #146c2e;
+    }
+    .voiceResult.bad{
+      color: #d21f1f;
+    }
+    .voiceActions{
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .voiceActions button{
+      width: 100%;
+      height: 44px;
+      border-radius: 12px;
+      border: 1px solid rgba(0,0,0,.18);
+      background: #fff;
+      color: #111;
+      font-size: 14px;
+      font-weight: 900;
+      touch-action: manipulation;
+      margin-top: 0;
+    }
+    .voiceActions button:disabled{
+      opacity: .45;
+    }
+    .voiceActions .primary{
+      background: rgba(144, 238, 144, .72);
+    }
+    .voiceActions .danger{
+      border-color: #d21f1f;
+      color: #d21f1f;
+    }
     .miniLabel{
       font-size: 12px;
       color: var(--muted);
@@ -1281,6 +1349,132 @@
       function parseIntSafe(x){
         const n = Number.parseInt(String(x), 10);
         return Number.isFinite(n) ? n : null;
+      }
+
+      function normalizeSpeechText(raw){
+        return String(raw || '')
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[’']/g, ' ')
+          .replace(/[-_]/g, ' ')
+          .replace(/[.,;:!?/\\()[\]{}]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      }
+
+      function parseFrenchNumberTokens(tokens){
+        const units = {
+          zero: 0, un: 1, une: 1, deux: 2, trois: 3, quatre: 4,
+          cinq: 5, six: 6, sept: 7, huit: 8, neuf: 9
+        };
+        const teens = {
+          dix: 10, onze: 11, douze: 12, treize: 13,
+          quatorze: 14, quinze: 15, seize: 16
+        };
+        const tens = {
+          vingt: 20, vingts: 20, trente: 30, quarante: 40,
+          cinquante: 50, soixante: 60, septante: 70,
+          huitante: 80, octante: 80, nonante: 90
+        };
+
+        let sign = 1;
+        let value = 0;
+        let found = false;
+
+        for(let i = 0; i < tokens.length; i++){
+          const tok = tokens[i];
+          if(tok === 'moins'){
+            sign = -1;
+            continue;
+          }
+          if(tok === 'et') continue;
+
+          if(tok === 'quatre' && (tokens[i + 1] === 'vingt' || tokens[i + 1] === 'vingts')){
+            value += 80;
+            found = true;
+            i++;
+            continue;
+          }
+
+          if(tok === 'cent' || tok === 'cents'){
+            value = value ? value * 100 : 100;
+            found = true;
+            continue;
+          }
+
+          if(Object.prototype.hasOwnProperty.call(tens, tok)){
+            value += tens[tok];
+            found = true;
+            continue;
+          }
+
+          if(Object.prototype.hasOwnProperty.call(teens, tok)){
+            value += teens[tok];
+            found = true;
+            continue;
+          }
+
+          if(Object.prototype.hasOwnProperty.call(units, tok)){
+            value += units[tok];
+            found = true;
+            continue;
+          }
+
+          return null;
+        }
+
+        return found ? sign * value : null;
+      }
+
+      function parseDictatedNumber(raw){
+        const rawText = String(raw || '');
+        const rawNumeric = rawText.toLowerCase().match(/(?:^|\s)(moins\s+)?(-?\d+)(?:\s|$)/);
+        if(rawNumeric){
+          const n = Number.parseInt(rawNumeric[2], 10);
+          if(!Number.isFinite(n)) return null;
+          return rawNumeric[1] && n > 0 ? -n : n;
+        }
+
+        const normalized = normalizeSpeechText(raw);
+        const numeric = normalized.match(/(?:^|\s)(moins\s+)?(-?\d+)(?:\s|$)/);
+        if(numeric){
+          const n = Number.parseInt(numeric[2], 10);
+          if(!Number.isFinite(n)) return null;
+          return numeric[1] && n > 0 ? -n : n;
+        }
+
+        const ignored = new Set([
+          'point', 'points', 'pts', 'pour', 'a', 'au', 'aux',
+          'equipe', 'score', 'nous', 'notre', 'nos',
+          'eux', 'leur', 'leurs', 'adversaire', 'adversaires',
+          'il', 'ils', 'elle', 'elles', 'on', 'ont', 'fait', 'font',
+          'marque', 'marquent', 'met', 'mets', 'mettre'
+        ]);
+        const tokens = normalized
+          .split(' ')
+          .filter(Boolean)
+          .filter(tok => !ignored.has(tok));
+
+        return parseFrenchNumberTokens(tokens);
+      }
+
+      function parseDictatedPoints(raw){
+        const normalized = normalizeSpeechText(raw);
+        if(!normalized) return {ok:false, message:'Dicte les points.'};
+
+        const hasNous = /\b(nous|notre|nos)\b/.test(normalized);
+        const hasEux = /\b(eux|leur|leurs|adversaire|adversaires)\b/.test(normalized);
+        if(hasNous && hasEux) return {ok:false, message:'Choisis une seule équipe.'};
+
+        const team = hasEux ? 'Eux' : (hasNous ? 'Nous' : null);
+        const points = parseDictatedNumber(raw);
+
+        if(!team && points === null) return {ok:false, message:"Je n'ai pas compris l'équipe ni les points."};
+        if(!team) return {ok:false, message:"Je n'ai pas compris l'équipe."};
+        if(points === null) return {ok:false, message:"Je n'ai pas compris les points."};
+
+        return {ok:true, team, points};
       }
 
       function formatSigned(n){
@@ -3008,6 +3202,20 @@
             <input id="pValue" type="number" step="1" inputmode="numeric" placeholder="000"/>
           </div>
 
+          <div class="field">
+            <button class="voiceButton" id="pVoice" type="button">Dicter</button>
+            <div class="voiceBox" id="pVoiceBox" hidden>
+              <div class="voiceTitle">Dictée</div>
+              <input id="pVoiceInput" type="text" placeholder="100 points pour eux" autocomplete="off" autocapitalize="none" enterkeyhint="done"/>
+              <div class="voiceResult" id="pVoiceResult">...</div>
+              <div class="voiceActions">
+                <button class="primary" id="pVoiceValidate" type="button" disabled>Valider</button>
+                <button id="pVoiceRetry" type="button">Redicter</button>
+                <button class="danger" id="pVoiceCancel" type="button">Annuler</button>
+              </div>
+            </div>
+          </div>
+
           <button class="primary" id="pSave">Valider</button>
           <div class="warning" id="pWarn" style="display:none;"></div>
           <div class="error" id="pError" style="display:none;"></div>
@@ -3018,6 +3226,15 @@
         const pValue = document.getElementById('pValue');
         const pWarn = document.getElementById('pWarn');
         const pError = document.getElementById('pError');
+        const pSave = document.getElementById('pSave');
+        const pVoice = document.getElementById('pVoice');
+        const pVoiceBox = document.getElementById('pVoiceBox');
+        const pVoiceInput = document.getElementById('pVoiceInput');
+        const pVoiceResult = document.getElementById('pVoiceResult');
+        const pVoiceValidate = document.getElementById('pVoiceValidate');
+        const pVoiceRetry = document.getElementById('pVoiceRetry');
+        const pVoiceCancel = document.getElementById('pVoiceCancel');
+        let parsedVoicePoints = null;
 
         pTour.value = String(cur);
         const who0 = suggestWhoForTour(cur);
@@ -3087,6 +3304,52 @@
           setError('');
         }
 
+        function focusVoiceInput(){
+          try{
+            pVoiceInput.focus({preventScroll:false});
+          }catch(e){
+            pVoiceInput.focus();
+          }
+          pVoiceInput.select();
+        }
+
+        function updateVoicePreview(){
+          const raw = pVoiceInput.value;
+          const parsed = parseDictatedPoints(raw);
+          parsedVoicePoints = parsed.ok ? parsed : null;
+          pVoiceValidate.disabled = !parsedVoicePoints;
+          pVoiceResult.className = 'voiceResult';
+
+          if(!String(raw || '').trim()){
+            pVoiceResult.textContent = '...';
+            return;
+          }
+
+          if(parsedVoicePoints){
+            pVoiceResult.classList.add('ok');
+            pVoiceResult.textContent = `${parsedVoicePoints.team} ${formatSigned(parsedVoicePoints.points)}`;
+          }else{
+            pVoiceResult.classList.add('bad');
+            pVoiceResult.textContent = parsed.message;
+          }
+        }
+
+        function openVoiceBox(){
+          pVoiceBox.hidden = false;
+          pSave.style.display = 'none';
+          pVoiceInput.value = '';
+          updateVoicePreview();
+          focusVoiceInput();
+        }
+
+        function closeVoiceBox(){
+          pVoiceBox.hidden = true;
+          pSave.style.display = '';
+          pVoiceInput.value = '';
+          parsedVoicePoints = null;
+          updateVoicePreview();
+        }
+
         pTour.addEventListener('change', () => {
           const tour = parseIntSafe(pTour.value);
           if(!tour || tour < 1){
@@ -3108,7 +3371,30 @@
           prefillPoints(tour, pWho.value);
         });
 
-        document.getElementById('pSave').addEventListener('click', () => {
+        pVoice.addEventListener('click', openVoiceBox);
+        pVoiceInput.addEventListener('input', updateVoicePreview);
+        pVoiceInput.addEventListener('keydown', (e) => {
+          if(e.key !== 'Enter') return;
+          e.preventDefault();
+          if(parsedVoicePoints) pVoiceValidate.click();
+        });
+        pVoiceRetry.addEventListener('click', () => {
+          pVoiceInput.value = '';
+          updateVoicePreview();
+          focusVoiceInput();
+        });
+        pVoiceCancel.addEventListener('click', closeVoiceBox);
+        pVoiceValidate.addEventListener('click', () => {
+          updateVoicePreview();
+          if(!parsedVoicePoints) return;
+
+          pWho.value = parsedVoicePoints.team;
+          pValue.value = String(parsedVoicePoints.points);
+          closeVoiceBox();
+          pSave.click();
+        });
+
+        pSave.addEventListener('click', () => {
           setError('');
 
           const tour = parseIntSafe(pTour.value);
