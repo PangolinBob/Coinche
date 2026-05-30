@@ -1261,7 +1261,7 @@
 
       const STORAGE_KEY = 'coinche_app_v1';
       const MAX_HISTORY = 60;
-      const APP_VERSION = '1.0.1';
+      const APP_VERSION = '1.0.3';
 	  
       // -------- Préférence : afficher l'accueil ----------
       const HOME_PREF_KEY = 'coinche_home_enabled';
@@ -1507,9 +1507,9 @@
           'eux', 'leur', 'leurs', 'adversaire', 'adversaires',
           'il', 'ils', 'elle', 'elles', 'on', 'ont', 'fait', 'font',
           'marque', 'marquent', 'met', 'mets', 'mettre',
-          'pique', 'piques', 'pic', 'spade', 'spades',
+          'pique', 'piques', 'pic', 'pics', 'spade', 'spades',
           'trefle', 'trefles', 'treffle', 'treffles', 'club', 'clubs',
-          'coeur', 'coeurs', 'heart', 'hearts',
+          'coeur', 'coeurs', 'heart', 'hearts', 'hacker', 'hackeur',
           'carreau', 'carreaux', 'caro', 'diamond', 'diamonds',
           'coinche', 'coince', 'surcoinche', 'surcoince'
         ]);
@@ -1551,9 +1551,9 @@
 
       function parseDictatedSuit(normalized){
         const matches = [];
-        if(/\b(pique|piques|pic|spade|spades)\b/.test(normalized)) matches.push({id:'spade', label:'pique'});
+        if(/\b(pique|piques|pic|pics|spade|spades)\b/.test(normalized)) matches.push({id:'spade', label:'pique'});
         if(/\b(trefle|trefles|treffle|treffles|club|clubs)\b/.test(normalized)) matches.push({id:'club', label:'trefle'});
-        if(/\b(coeur|coeurs|heart|hearts)\b/.test(normalized)) matches.push({id:'heart', label:'coeur'});
+        if(/\b(coeur|coeurs|heart|hearts|hacker|hackeur)\b/.test(normalized)) matches.push({id:'heart', label:'coeur'});
         if(/\b(carreau|carreaux|caro|diamond|diamonds)\b/.test(normalized)) matches.push({id:'diamond', label:'carreau'});
 
         const unique = [];
@@ -1628,7 +1628,7 @@
       }
 
       function hasDictatedContractCue(normalized){
-        return /\b(tout le monde passe|passe|passent|personne|cap|capot|gen|general|generale|coinche|coince|surcoinche|surcoince|pique|piques|pic|trefle|trefles|treffle|treffles|coeur|coeurs|carreau|carreaux|caro)\b/.test(normalized);
+        return /\b(tout le monde passe|passe|passent|personne|cap|capot|gen|general|generale|coinche|coince|surcoinche|surcoince|pique|piques|pic|pics|trefle|trefles|treffle|treffles|coeur|coeurs|hacker|hackeur|carreau|carreaux|caro)\b/.test(normalized);
       }
 
       function parseGlobalDictation(raw){
