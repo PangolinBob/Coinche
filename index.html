@@ -677,6 +677,11 @@
       margin-top: 0;
       box-shadow: var(--shadow);
     }
+    .globalVoiceBox.listening #globalVoiceInput{
+      border-color: #3ba55d;
+      box-shadow: 0 0 0 3px rgba(59, 165, 93, .16);
+      transition: border-color .16s ease, box-shadow .16s ease;
+    }
 
     /* Bottom bar */
     .bar{
@@ -962,6 +967,12 @@
     }
     .voiceResult.bad{
       color: #d21f1f;
+    }
+    .voiceResult.listening{
+      color: #146c2e;
+    }
+    .voiceResult.processing{
+      color: #7a5a00;
     }
     .voiceActions{
       display: grid;
@@ -1261,7 +1272,7 @@
 
       const STORAGE_KEY = 'coinche_app_v1';
       const MAX_HISTORY = 60;
-      const APP_VERSION = '1.0.3';
+      const APP_VERSION = '1.0.4';
 	  
       // -------- Préférence : afficher l'accueil ----------
       const HOME_PREF_KEY = 'coinche_home_enabled';
@@ -1664,7 +1675,7 @@
           const recognition = new Ctor();
           recognition.lang = 'fr-FR';
           recognition.continuous = false;
-          recognition.interimResults = false;
+          recognition.interimResults = true;
           recognition.maxAlternatives = 3;
           return recognition;
         }catch(e){
@@ -1673,10 +1684,28 @@
       }
 
       function speechTranscriptFromEvent(event){
-        if(!event || !event.results) return '';
-        const result = event.results[0];
-        if(!result || !result[0]) return '';
-        return String(result[0].transcript || '').trim();
+        const empty = { text: '', finalText: '', interimText: '', isFinal: false };
+        if(!event || !event.results) return empty;
+
+        let finalText = '';
+        let interimText = '';
+
+        for(let i=0; i<event.results.length; i++){
+          const result = event.results[i];
+          if(!result || !result[0]) continue;
+          const chunk = String(result[0].transcript || '').replace(/\s+/g, ' ').trim();
+          if(!chunk) continue;
+          if(result.isFinal) finalText = `${finalText} ${chunk}`.trim();
+          else interimText = `${interimText} ${chunk}`.trim();
+        }
+
+        const text = `${finalText} ${interimText}`.replace(/\s+/g, ' ').trim();
+        return {
+          text,
+          finalText,
+          interimText,
+          isFinal: !!finalText && !interimText
+        };
       }
 
       function formatSigned(n){
@@ -2090,15 +2119,32 @@
         setTimeout(update, 720);
       }
 
+      function setGlobalVoiceListening(active){
+        if(elGlobalVoiceBox) elGlobalVoiceBox.classList.toggle('listening', !!active);
+      }
+
+      function setGlobalVoiceStatus(message, statusClass){
+        if(!elGlobalVoiceResult) return;
+        elGlobalVoiceResult.className = 'voiceResult';
+        if(statusClass) elGlobalVoiceResult.classList.add(statusClass);
+        elGlobalVoiceResult.textContent = message;
+      }
+
       function stopGlobalSpeechRecognition(){
         const recognition = globalVoiceRecognition;
         globalVoiceRecognition = null;
         setActiveVoiceCaptureStop(null);
+        setGlobalVoiceListening(false);
         if(!recognition) return;
         recognition.onresult = null;
         recognition.onerror = null;
         recognition.onend = null;
         recognition.onnomatch = null;
+        recognition.onaudiostart = null;
+        recognition.onsoundstart = null;
+        recognition.onspeechstart = null;
+        recognition.onspeechend = null;
+        recognition.onaudioend = null;
         try{ recognition.abort(); }catch(e){}
       }
 
@@ -2119,7 +2165,7 @@
         const raw = elGlobalVoiceInput.value;
         const parsed = parseGlobalDictation(raw);
         parsedGlobalVoice = parsed.ok ? parsed : null;
-        elGlobalVoiceValidate.disabled = !parsedGlobalVoice;
+        elGlobalVoiceValidate.disabled = !parsedGlobalVoice || !!globalVoiceRecognition;
         elGlobalVoiceResult.className = 'voiceResult';
 
         if(!String(raw || '').trim()){
@@ -2138,6 +2184,7 @@
 
       function showGlobalVoiceFallback(msg){
         if(!elGlobalVoiceResult) return;
+        setGlobalVoiceListening(false);
         elGlobalVoiceResult.className = 'voiceResult';
         elGlobalVoiceResult.textContent = msg || 'Dictée clavier prête.';
         focusGlobalVoiceInput();
@@ -2154,28 +2201,68 @@
 
         globalVoiceRecognition = recognition;
         setActiveVoiceCaptureStop(stopGlobalSpeechRecognition);
-        if(elGlobalVoiceResult){
-          elGlobalVoiceResult.className = 'voiceResult';
-          elGlobalVoiceResult.textContent = 'Écoute...';
-        }
+        setGlobalVoiceListening(true);
+        setGlobalVoiceStatus('Écoute...', 'listening');
         if(elGlobalVoiceValidate) elGlobalVoiceValidate.disabled = true;
 
         let gotResult = false;
+        let gotFinalResult = false;
+        let latestTranscript = '';
+
+        recognition.onaudiostart = () => {
+          if(globalVoiceRecognition !== recognition || latestTranscript) return;
+          setGlobalVoiceStatus('Micro lancé...', 'listening');
+        };
+
+        recognition.onsoundstart = () => {
+          if(globalVoiceRecognition !== recognition || latestTranscript) return;
+          setGlobalVoiceStatus('Son détecté...', 'listening');
+        };
+
+        recognition.onspeechstart = () => {
+          if(globalVoiceRecognition !== recognition || latestTranscript) return;
+          setGlobalVoiceStatus('Voix détectée...', 'listening');
+        };
+
+        recognition.onspeechend = () => {
+          if(globalVoiceRecognition !== recognition || latestTranscript) return;
+          setGlobalVoiceStatus('Analyse...', 'processing');
+        };
+
+        recognition.onaudioend = () => {
+          if(globalVoiceRecognition !== recognition || latestTranscript) return;
+          setGlobalVoiceStatus('Analyse...', 'processing');
+        };
 
         recognition.onresult = (event) => {
           if(globalVoiceRecognition !== recognition) return;
           gotResult = true;
           const transcript = speechTranscriptFromEvent(event);
-          globalVoiceRecognition = null;
-          setActiveVoiceCaptureStop(null);
 
-          if(!transcript){
+          if(!transcript.text){
+            globalVoiceRecognition = null;
+            setActiveVoiceCaptureStop(null);
             showGlobalVoiceFallback("Je n'ai rien entendu. Dictée clavier prête.");
             return;
           }
 
-          elGlobalVoiceInput.value = transcript;
+          latestTranscript = transcript.text;
+          elGlobalVoiceInput.value = latestTranscript;
+
+          if(transcript.isFinal){
+            gotFinalResult = true;
+            globalVoiceRecognition = null;
+            setActiveVoiceCaptureStop(null);
+            setGlobalVoiceListening(false);
+          }
+
           updateGlobalVoicePreview();
+
+          if(!transcript.isFinal){
+            if(elGlobalVoiceValidate) elGlobalVoiceValidate.disabled = true;
+            return;
+          }
+
           if(!parsedGlobalVoice) focusGlobalVoiceInput();
         };
 
@@ -2183,6 +2270,7 @@
           if(globalVoiceRecognition !== recognition) return;
           globalVoiceRecognition = null;
           setActiveVoiceCaptureStop(null);
+          setGlobalVoiceListening(false);
           showGlobalVoiceFallback('Micro auto indisponible. Dictée clavier prête.');
         };
 
@@ -2190,6 +2278,7 @@
           if(globalVoiceRecognition !== recognition) return;
           globalVoiceRecognition = null;
           setActiveVoiceCaptureStop(null);
+          setGlobalVoiceListening(false);
           showGlobalVoiceFallback("Je n'ai rien entendu. Dictée clavier prête.");
         };
 
@@ -2197,6 +2286,12 @@
           if(globalVoiceRecognition !== recognition) return;
           globalVoiceRecognition = null;
           setActiveVoiceCaptureStop(null);
+          setGlobalVoiceListening(false);
+          if(latestTranscript && !gotFinalResult){
+            updateGlobalVoicePreview();
+            if(!parsedGlobalVoice) focusGlobalVoiceInput();
+            return;
+          }
           if(!gotResult && !String(elGlobalVoiceInput.value || '').trim()){
             showGlobalVoiceFallback("Je n'ai rien entendu. Dictée clavier prête.");
           }
@@ -2207,6 +2302,7 @@
         }catch(e){
           globalVoiceRecognition = null;
           setActiveVoiceCaptureStop(null);
+          setGlobalVoiceListening(false);
           showGlobalVoiceFallback('Micro auto indisponible. Dictée clavier prête.');
         }
       }
