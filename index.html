@@ -1378,7 +1378,7 @@
           cinquante: 50, soixante: 60, septante: 70,
           huitante: 80, octante: 80, nonante: 90
         };
-        const hundreds = new Set(['cent', 'cents', 'sans', 'sang', 'sens']);
+        const hundreds = new Set(['cent', 'cents', 'sans', 'sang', 'sens', 'son']);
 
         let sign = 1;
         let value = 0;
@@ -1448,7 +1448,7 @@
 
         const ignored = new Set([
           'point', 'points', 'pts', 'pour', 'a', 'au', 'aux',
-          'equipe', 'score', 'nous', 'notre', 'nos',
+          'equipe', 'score', 'nous', 'notre', 'nos', 'porno',
           'eux', 'leur', 'leurs', 'adversaire', 'adversaires',
           'il', 'ils', 'elle', 'elles', 'on', 'ont', 'fait', 'font',
           'marque', 'marquent', 'met', 'mets', 'mettre',
@@ -1466,26 +1466,8 @@
         return parseFrenchNumberTokens(tokens);
       }
 
-      function parseDictatedPoints(raw){
-        const normalized = normalizeSpeechText(raw);
-        if(!normalized) return {ok:false, message:'Dicte les points.'};
-
-        const hasNous = /\b(nous|notre|nos)\b/.test(normalized);
-        const hasEux = /\b(eux|leur|leurs|adversaire|adversaires)\b/.test(normalized);
-        if(hasNous && hasEux) return {ok:false, message:'Choisis une seule équipe.'};
-
-        const team = hasEux ? 'Eux' : (hasNous ? 'Nous' : null);
-        const points = parseDictatedNumber(raw);
-
-        if(!team && points === null) return {ok:false, message:"Je n'ai pas compris l'équipe ni les points."};
-        if(!team) return {ok:false, message:"Je n'ai pas compris l'équipe."};
-        if(points === null) return {ok:false, message:"Je n'ai pas compris les points."};
-
-        return {ok:true, team, points};
-      }
-
       function detectDictatedTeam(normalized){
-        const hasNous = /\b(nous|notre|nos)\b/.test(normalized);
+        const hasNous = /\b(nous|notre|nos|porno)\b/.test(normalized);
         const hasEux = /\b(eux|leur|leurs|adversaire|adversaires)\b/.test(normalized);
         return {
           hasNous,
@@ -1493,6 +1475,23 @@
           ambiguous: hasNous && hasEux,
           team: hasEux && !hasNous ? 'Eux' : (hasNous && !hasEux ? 'Nous' : null)
         };
+      }
+
+      function parseDictatedPoints(raw){
+        const normalized = normalizeSpeechText(raw);
+        if(!normalized) return {ok:false, message:'Dicte les points.'};
+
+        const teamInfo = detectDictatedTeam(normalized);
+        if(teamInfo.ambiguous) return {ok:false, message:'Choisis une seule équipe.'};
+
+        const team = teamInfo.team;
+        const points = parseDictatedNumber(raw);
+
+        if(!team && points === null) return {ok:false, message:"Je n'ai pas compris l'équipe ni les points."};
+        if(!team) return {ok:false, message:"Je n'ai pas compris l'équipe."};
+        if(points === null) return {ok:false, message:"Je n'ai pas compris les points."};
+
+        return {ok:true, team, points};
       }
 
       function parseDictatedSuit(normalized){
@@ -1571,6 +1570,29 @@
           label: `${team} ${points} ${suitInfo.label}${coinche === 'SC' ? ' surcoinché' : (coinche === 'C' ? ' coinché' : '')}`,
           contract: { team, kind: 'number', value: points, suit: suitInfo.suit, coinche }
         };
+      }
+
+      function createSpeechRecognition(){
+        const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if(!Ctor) return null;
+
+        try{
+          const recognition = new Ctor();
+          recognition.lang = 'fr-FR';
+          recognition.continuous = false;
+          recognition.interimResults = false;
+          recognition.maxAlternatives = 3;
+          return recognition;
+        }catch(e){
+          return null;
+        }
+      }
+
+      function speechTranscriptFromEvent(event){
+        if(!event || !event.results) return '';
+        const result = event.results[0];
+        if(!result || !result[0]) return '';
+        return String(result[0].transcript || '').trim();
       }
 
       function formatSigned(n){
@@ -2914,8 +2936,22 @@
       const btnAutres  = document.getElementById('btnAutres');
 
       let activePanel = null; // 'contrat'|'points'|'autres'|null
+      let stopActiveVoiceCapture = null;
+
+      function setActiveVoiceCaptureStop(fn){
+        stopActiveVoiceCapture = (typeof fn === 'function') ? fn : null;
+      }
+
+      function stopVoiceCapture(){
+        const fn = stopActiveVoiceCapture;
+        stopActiveVoiceCapture = null;
+        if(fn){
+          try{ fn(); }catch(e){}
+        }
+      }
 
       function openPanel(which){
+        stopVoiceCapture();
         activePanel = which;
         panelTitle.textContent = which === 'contrat' ? 'Contrat' : (which === 'points' ? 'Points' : 'Autres');
 
@@ -2929,6 +2965,7 @@
       }
 
       function closePanel(){
+        stopVoiceCapture();
         activePanel = null;
         placementOpen = false; // replier "Placement" à chaque fermeture
         overlay.classList.remove('open');
@@ -3041,6 +3078,7 @@
         const cVoiceRetry = document.getElementById('cVoiceRetry');
         const cVoiceCancel = document.getElementById('cVoiceCancel');
         let parsedVoiceContract = null;
+        let cVoiceRecognition = null;
 
         // Defaults
         cTour.value = String(cur);
@@ -3174,7 +3212,7 @@
         cVoiceRetry.addEventListener('click', () => {
           cVoiceInput.value = '';
           updateContractVoicePreview();
-          focusContractVoiceInput();
+          startContractSpeechRecognition();
         });
         cVoiceCancel.addEventListener('click', closeContractVoiceBox);
         cVoiceValidate.addEventListener('click', () => {
@@ -3224,6 +3262,90 @@
           cVoiceInput.select();
         }
 
+        function stopContractSpeechRecognition(){
+          const recognition = cVoiceRecognition;
+          cVoiceRecognition = null;
+          setActiveVoiceCaptureStop(null);
+          if(!recognition) return;
+          recognition.onresult = null;
+          recognition.onerror = null;
+          recognition.onend = null;
+          recognition.onnomatch = null;
+          try{ recognition.abort(); }catch(e){}
+        }
+
+        function showContractVoiceFallback(msg){
+          cVoiceResult.className = 'voiceResult';
+          cVoiceResult.textContent = msg || 'Dictée clavier prête.';
+          focusContractVoiceInput();
+        }
+
+        function startContractSpeechRecognition(){
+          stopContractSpeechRecognition();
+
+          const recognition = createSpeechRecognition();
+          if(!recognition){
+            showContractVoiceFallback('Micro auto indisponible. Dictée clavier prête.');
+            return;
+          }
+
+          cVoiceRecognition = recognition;
+          setActiveVoiceCaptureStop(stopContractSpeechRecognition);
+          cVoiceResult.className = 'voiceResult';
+          cVoiceResult.textContent = 'Écoute...';
+          cVoiceValidate.disabled = true;
+
+          let gotResult = false;
+
+          recognition.onresult = (event) => {
+            if(cVoiceRecognition !== recognition) return;
+            gotResult = true;
+            const transcript = speechTranscriptFromEvent(event);
+            cVoiceRecognition = null;
+            setActiveVoiceCaptureStop(null);
+
+            if(!transcript){
+              showContractVoiceFallback("Je n'ai rien entendu. Dictée clavier prête.");
+              return;
+            }
+
+            cVoiceInput.value = transcript;
+            updateContractVoicePreview();
+            if(!parsedVoiceContract) focusContractVoiceInput();
+          };
+
+          recognition.onerror = () => {
+            if(cVoiceRecognition !== recognition) return;
+            cVoiceRecognition = null;
+            setActiveVoiceCaptureStop(null);
+            showContractVoiceFallback('Micro auto indisponible. Dictée clavier prête.');
+          };
+
+          recognition.onnomatch = () => {
+            if(cVoiceRecognition !== recognition) return;
+            cVoiceRecognition = null;
+            setActiveVoiceCaptureStop(null);
+            showContractVoiceFallback("Je n'ai rien entendu. Dictée clavier prête.");
+          };
+
+          recognition.onend = () => {
+            if(cVoiceRecognition !== recognition) return;
+            cVoiceRecognition = null;
+            setActiveVoiceCaptureStop(null);
+            if(!gotResult && !String(cVoiceInput.value || '').trim()){
+              showContractVoiceFallback("Je n'ai rien entendu. Dictée clavier prête.");
+            }
+          };
+
+          try{
+            recognition.start();
+          }catch(e){
+            cVoiceRecognition = null;
+            setActiveVoiceCaptureStop(null);
+            showContractVoiceFallback('Micro auto indisponible. Dictée clavier prête.');
+          }
+        }
+
         function updateContractVoicePreview(){
           const raw = cVoiceInput.value;
           const parsed = parseDictatedContract(raw);
@@ -3250,10 +3372,11 @@
           cSave.style.display = 'none';
           cVoiceInput.value = '';
           updateContractVoicePreview();
-          focusContractVoiceInput();
+          startContractSpeechRecognition();
         }
 
         function closeContractVoiceBox(){
+          stopContractSpeechRecognition();
           cVoiceBox.hidden = true;
           cVoiceInput.value = '';
           parsedVoiceContract = null;
@@ -3447,6 +3570,7 @@
         const pVoiceRetry = document.getElementById('pVoiceRetry');
         const pVoiceCancel = document.getElementById('pVoiceCancel');
         let parsedVoicePoints = null;
+        let pVoiceRecognition = null;
 
         pTour.value = String(cur);
         const who0 = suggestWhoForTour(cur);
@@ -3525,6 +3649,90 @@
           pVoiceInput.select();
         }
 
+        function stopPointSpeechRecognition(){
+          const recognition = pVoiceRecognition;
+          pVoiceRecognition = null;
+          setActiveVoiceCaptureStop(null);
+          if(!recognition) return;
+          recognition.onresult = null;
+          recognition.onerror = null;
+          recognition.onend = null;
+          recognition.onnomatch = null;
+          try{ recognition.abort(); }catch(e){}
+        }
+
+        function showPointVoiceFallback(msg){
+          pVoiceResult.className = 'voiceResult';
+          pVoiceResult.textContent = msg || 'Dictée clavier prête.';
+          focusVoiceInput();
+        }
+
+        function startPointSpeechRecognition(){
+          stopPointSpeechRecognition();
+
+          const recognition = createSpeechRecognition();
+          if(!recognition){
+            showPointVoiceFallback('Micro auto indisponible. Dictée clavier prête.');
+            return;
+          }
+
+          pVoiceRecognition = recognition;
+          setActiveVoiceCaptureStop(stopPointSpeechRecognition);
+          pVoiceResult.className = 'voiceResult';
+          pVoiceResult.textContent = 'Écoute...';
+          pVoiceValidate.disabled = true;
+
+          let gotResult = false;
+
+          recognition.onresult = (event) => {
+            if(pVoiceRecognition !== recognition) return;
+            gotResult = true;
+            const transcript = speechTranscriptFromEvent(event);
+            pVoiceRecognition = null;
+            setActiveVoiceCaptureStop(null);
+
+            if(!transcript){
+              showPointVoiceFallback("Je n'ai rien entendu. Dictée clavier prête.");
+              return;
+            }
+
+            pVoiceInput.value = transcript;
+            updateVoicePreview();
+            if(!parsedVoicePoints) focusVoiceInput();
+          };
+
+          recognition.onerror = () => {
+            if(pVoiceRecognition !== recognition) return;
+            pVoiceRecognition = null;
+            setActiveVoiceCaptureStop(null);
+            showPointVoiceFallback('Micro auto indisponible. Dictée clavier prête.');
+          };
+
+          recognition.onnomatch = () => {
+            if(pVoiceRecognition !== recognition) return;
+            pVoiceRecognition = null;
+            setActiveVoiceCaptureStop(null);
+            showPointVoiceFallback("Je n'ai rien entendu. Dictée clavier prête.");
+          };
+
+          recognition.onend = () => {
+            if(pVoiceRecognition !== recognition) return;
+            pVoiceRecognition = null;
+            setActiveVoiceCaptureStop(null);
+            if(!gotResult && !String(pVoiceInput.value || '').trim()){
+              showPointVoiceFallback("Je n'ai rien entendu. Dictée clavier prête.");
+            }
+          };
+
+          try{
+            recognition.start();
+          }catch(e){
+            pVoiceRecognition = null;
+            setActiveVoiceCaptureStop(null);
+            showPointVoiceFallback('Micro auto indisponible. Dictée clavier prête.');
+          }
+        }
+
         function updateVoicePreview(){
           const raw = pVoiceInput.value;
           const parsed = parseDictatedPoints(raw);
@@ -3551,10 +3759,11 @@
           pSave.style.display = 'none';
           pVoiceInput.value = '';
           updateVoicePreview();
-          focusVoiceInput();
+          startPointSpeechRecognition();
         }
 
         function closeVoiceBox(){
+          stopPointSpeechRecognition();
           pVoiceBox.hidden = true;
           pSave.style.display = '';
           pVoiceInput.value = '';
@@ -3593,7 +3802,7 @@
         pVoiceRetry.addEventListener('click', () => {
           pVoiceInput.value = '';
           updateVoicePreview();
-          focusVoiceInput();
+          startPointSpeechRecognition();
         });
         pVoiceCancel.addEventListener('click', closeVoiceBox);
         pVoiceValidate.addEventListener('click', () => {
