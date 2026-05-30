@@ -1378,6 +1378,7 @@
           cinquante: 50, soixante: 60, septante: 70,
           huitante: 80, octante: 80, nonante: 90
         };
+        const hundreds = new Set(['cent', 'cents', 'sans', 'sang', 'sens']);
 
         let sign = 1;
         let value = 0;
@@ -1398,7 +1399,7 @@
             continue;
           }
 
-          if(tok === 'cent' || tok === 'cents'){
+          if(hundreds.has(tok)){
             value = value ? value * 100 : 100;
             found = true;
             continue;
@@ -1450,7 +1451,12 @@
           'equipe', 'score', 'nous', 'notre', 'nos',
           'eux', 'leur', 'leurs', 'adversaire', 'adversaires',
           'il', 'ils', 'elle', 'elles', 'on', 'ont', 'fait', 'font',
-          'marque', 'marquent', 'met', 'mets', 'mettre'
+          'marque', 'marquent', 'met', 'mets', 'mettre',
+          'pique', 'piques', 'pic', 'spade', 'spades',
+          'trefle', 'trefles', 'treffle', 'treffles', 'club', 'clubs',
+          'coeur', 'coeurs', 'heart', 'hearts',
+          'carreau', 'carreaux', 'caro', 'diamond', 'diamonds',
+          'coinche', 'coince', 'surcoinche', 'surcoince'
         ]);
         const tokens = normalized
           .split(' ')
