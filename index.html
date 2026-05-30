@@ -641,6 +641,43 @@
       box-shadow: 0 1px 0 rgba(0,0,0,.20);
     }
 
+    .globalVoiceButton{
+      position: fixed;
+      left: 12px;
+      bottom: calc(var(--bar-h) + env(safe-area-inset-bottom) + 14px);
+      z-index: 56;
+      width: 54px;
+      height: 44px;
+      border-radius: 12px;
+      border: 1px solid rgba(0,0,0,.18);
+      background: #fff;
+      color: #111;
+      box-shadow: 0 1px 0 rgba(0,0,0,.20);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: manipulation;
+    }
+    .globalVoiceButton.on{
+      background: rgba(144, 238, 144, .72);
+    }
+    .globalVoiceButton svg{
+      width: 22px;
+      height: 22px;
+      display: block;
+      stroke-width: 2.4;
+    }
+    .globalVoiceBox{
+      --global-keyboard-inset: 0px;
+      position: fixed;
+      left: 12px;
+      bottom: calc(var(--bar-h) + env(safe-area-inset-bottom) + 72px + var(--global-keyboard-inset));
+      z-index: 57;
+      width: min(330px, calc(100vw - 24px));
+      margin-top: 0;
+      box-shadow: var(--shadow);
+    }
+
     /* Bottom bar */
     .bar{
       position: fixed;
@@ -897,17 +934,6 @@
       gap: 10px;
       margin-top: 8px;
     }
-    .voiceButton{
-      width: 100%;
-      height: 48px;
-      border-radius: 14px;
-      border: 1px solid rgba(0,0,0,.18);
-      background: #fff;
-      color: #111;
-      font-size: 16px;
-      font-weight: 900;
-      touch-action: manipulation;
-    }
     .voiceBox{
       margin-top: 12px;
       padding: 12px;
@@ -1153,6 +1179,23 @@
       </div>
 
       <div id="dealerGrid" class="dealerGrid" aria-label="Qui donne"></div>
+      <button id="globalVoiceButton" class="globalVoiceButton" type="button" aria-label="Dicter">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+          <path d="M12 19v3"></path>
+        </svg>
+      </button>
+      <div id="globalVoiceBox" class="voiceBox globalVoiceBox" hidden>
+        <div class="voiceTitle">Dictée</div>
+        <input id="globalVoiceInput" type="text" placeholder="100 coeur pour eux" autocomplete="off" autocapitalize="none" enterkeyhint="done"/>
+        <div class="voiceResult" id="globalVoiceResult">...</div>
+        <div class="voiceActions">
+          <button class="primary" id="globalVoiceValidate" type="button" disabled>Valider</button>
+          <button id="globalVoiceRetry" type="button">Redicter</button>
+          <button class="danger" id="globalVoiceCancel" type="button">Annuler</button>
+        </div>
+      </div>
       </div>
 
       <div id="graphView" style="display:none;" aria-label="Graphique des scores">
@@ -1218,7 +1261,7 @@
 
       const STORAGE_KEY = 'coinche_app_v1';
       const MAX_HISTORY = 60;
-      const APP_VERSION = '1.0.0';
+      const APP_VERSION = '1.0.1';
 	  
       // -------- Préférence : afficher l'accueil ----------
       const HOME_PREF_KEY = 'coinche_home_enabled';
@@ -1584,6 +1627,35 @@
         };
       }
 
+      function hasDictatedContractCue(normalized){
+        return /\b(tout le monde passe|passe|passent|personne|cap|capot|gen|general|generale|coinche|coince|surcoinche|surcoince|pique|piques|pic|trefle|trefles|treffle|treffles|coeur|coeurs|carreau|carreaux|caro)\b/.test(normalized);
+      }
+
+      function parseGlobalDictation(raw){
+        const normalized = normalizeSpeechText(raw);
+        if(!normalized) return {ok:false, message:'Dicte un contrat ou des points.'};
+
+        if(hasDictatedContractCue(normalized)){
+          const contract = parseDictatedContract(raw);
+          if(!contract.ok) return contract;
+          return {
+            ok: true,
+            type: 'contract',
+            label: `Contrat : ${contract.label}`,
+            parsed: contract
+          };
+        }
+
+        const points = parseDictatedPoints(raw);
+        if(!points.ok) return points;
+        return {
+          ok: true,
+          type: 'points',
+          label: `Points : ${points.team} ${formatSigned(points.points)}`,
+          parsed: points
+        };
+      }
+
       function createSpeechRecognition(){
         const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
         if(!Ctor) return null;
@@ -1847,6 +1919,17 @@
       const elExportCopy = document.getElementById('exportCopy');
       const elSheet = document.querySelector('#sheetView .sheet');
       const elSheetHeader = document.querySelector('#sheetView .sheetHeader');
+      const elGlobalVoiceButton = document.getElementById('globalVoiceButton');
+      const elGlobalVoiceBox = document.getElementById('globalVoiceBox');
+      const elGlobalVoiceInput = document.getElementById('globalVoiceInput');
+      const elGlobalVoiceResult = document.getElementById('globalVoiceResult');
+      const elGlobalVoiceValidate = document.getElementById('globalVoiceValidate');
+      const elGlobalVoiceRetry = document.getElementById('globalVoiceRetry');
+      const elGlobalVoiceCancel = document.getElementById('globalVoiceCancel');
+
+      let parsedGlobalVoice = null;
+      let globalVoiceRecognition = null;
+      let globalVoiceKeyboardCleanup = null;
 
       function syncSheetHeaderSpace(){
         if(!elSheet || !elSheetHeader) return;
@@ -1968,6 +2051,284 @@
           cell.title = state.players[i];
           elDealerGrid.appendChild(cell);
         }
+      }
+
+      function clearGlobalVoiceKeyboard(){
+        if(globalVoiceKeyboardCleanup){
+          try{ globalVoiceKeyboardCleanup(); }catch(e){}
+          globalVoiceKeyboardCleanup = null;
+        }
+        if(elGlobalVoiceBox) elGlobalVoiceBox.style.setProperty('--global-keyboard-inset', '0px');
+      }
+
+      function keepGlobalVoiceVisible(){
+        if(!elGlobalVoiceBox || !elGlobalVoiceInput) return;
+        clearGlobalVoiceKeyboard();
+
+        const update = () => {
+          const inset = keyboardInsetPx();
+          elGlobalVoiceBox.style.setProperty('--global-keyboard-inset', inset ? `${inset + 8}px` : '0px');
+        };
+
+        const vv = window.visualViewport;
+        if(vv){
+          vv.addEventListener('resize', update);
+          vv.addEventListener('scroll', update);
+        }
+        window.addEventListener('resize', update);
+        globalVoiceKeyboardCleanup = () => {
+          if(vv){
+            vv.removeEventListener('resize', update);
+            vv.removeEventListener('scroll', update);
+          }
+          window.removeEventListener('resize', update);
+        };
+
+        update();
+        setTimeout(update, 120);
+        setTimeout(update, 360);
+        setTimeout(update, 720);
+      }
+
+      function stopGlobalSpeechRecognition(){
+        const recognition = globalVoiceRecognition;
+        globalVoiceRecognition = null;
+        setActiveVoiceCaptureStop(null);
+        if(!recognition) return;
+        recognition.onresult = null;
+        recognition.onerror = null;
+        recognition.onend = null;
+        recognition.onnomatch = null;
+        try{ recognition.abort(); }catch(e){}
+      }
+
+      function focusGlobalVoiceInput(){
+        if(!elGlobalVoiceInput) return;
+        try{
+          elGlobalVoiceInput.focus({preventScroll:false});
+        }catch(e){
+          elGlobalVoiceInput.focus();
+        }
+        elGlobalVoiceInput.select();
+        keepGlobalVoiceVisible();
+      }
+
+      function updateGlobalVoicePreview(){
+        if(!elGlobalVoiceInput || !elGlobalVoiceResult || !elGlobalVoiceValidate) return;
+
+        const raw = elGlobalVoiceInput.value;
+        const parsed = parseGlobalDictation(raw);
+        parsedGlobalVoice = parsed.ok ? parsed : null;
+        elGlobalVoiceValidate.disabled = !parsedGlobalVoice;
+        elGlobalVoiceResult.className = 'voiceResult';
+
+        if(!String(raw || '').trim()){
+          elGlobalVoiceResult.textContent = '...';
+          return;
+        }
+
+        if(parsedGlobalVoice){
+          elGlobalVoiceResult.classList.add('ok');
+          elGlobalVoiceResult.textContent = parsedGlobalVoice.label;
+        }else{
+          elGlobalVoiceResult.classList.add('bad');
+          elGlobalVoiceResult.textContent = parsed.message;
+        }
+      }
+
+      function showGlobalVoiceFallback(msg){
+        if(!elGlobalVoiceResult) return;
+        elGlobalVoiceResult.className = 'voiceResult';
+        elGlobalVoiceResult.textContent = msg || 'Dictée clavier prête.';
+        focusGlobalVoiceInput();
+      }
+
+      function startGlobalSpeechRecognition(){
+        stopGlobalSpeechRecognition();
+
+        const recognition = createSpeechRecognition();
+        if(!recognition){
+          showGlobalVoiceFallback('Micro auto indisponible. Dictée clavier prête.');
+          return;
+        }
+
+        globalVoiceRecognition = recognition;
+        setActiveVoiceCaptureStop(stopGlobalSpeechRecognition);
+        if(elGlobalVoiceResult){
+          elGlobalVoiceResult.className = 'voiceResult';
+          elGlobalVoiceResult.textContent = 'Écoute...';
+        }
+        if(elGlobalVoiceValidate) elGlobalVoiceValidate.disabled = true;
+
+        let gotResult = false;
+
+        recognition.onresult = (event) => {
+          if(globalVoiceRecognition !== recognition) return;
+          gotResult = true;
+          const transcript = speechTranscriptFromEvent(event);
+          globalVoiceRecognition = null;
+          setActiveVoiceCaptureStop(null);
+
+          if(!transcript){
+            showGlobalVoiceFallback("Je n'ai rien entendu. Dictée clavier prête.");
+            return;
+          }
+
+          elGlobalVoiceInput.value = transcript;
+          updateGlobalVoicePreview();
+          if(!parsedGlobalVoice) focusGlobalVoiceInput();
+        };
+
+        recognition.onerror = () => {
+          if(globalVoiceRecognition !== recognition) return;
+          globalVoiceRecognition = null;
+          setActiveVoiceCaptureStop(null);
+          showGlobalVoiceFallback('Micro auto indisponible. Dictée clavier prête.');
+        };
+
+        recognition.onnomatch = () => {
+          if(globalVoiceRecognition !== recognition) return;
+          globalVoiceRecognition = null;
+          setActiveVoiceCaptureStop(null);
+          showGlobalVoiceFallback("Je n'ai rien entendu. Dictée clavier prête.");
+        };
+
+        recognition.onend = () => {
+          if(globalVoiceRecognition !== recognition) return;
+          globalVoiceRecognition = null;
+          setActiveVoiceCaptureStop(null);
+          if(!gotResult && !String(elGlobalVoiceInput.value || '').trim()){
+            showGlobalVoiceFallback("Je n'ai rien entendu. Dictée clavier prête.");
+          }
+        };
+
+        try{
+          recognition.start();
+        }catch(e){
+          globalVoiceRecognition = null;
+          setActiveVoiceCaptureStop(null);
+          showGlobalVoiceFallback('Micro auto indisponible. Dictée clavier prête.');
+        }
+      }
+
+      function openGlobalVoiceBox(){
+        if(!elGlobalVoiceBox) return;
+        closePanel();
+        elGlobalVoiceBox.hidden = false;
+        if(elGlobalVoiceButton) elGlobalVoiceButton.classList.add('on');
+        if(elGlobalVoiceInput) elGlobalVoiceInput.value = '';
+        parsedGlobalVoice = null;
+        updateGlobalVoicePreview();
+        startGlobalSpeechRecognition();
+      }
+
+      function closeGlobalVoiceBox(){
+        stopGlobalSpeechRecognition();
+        clearGlobalVoiceKeyboard();
+        if(elGlobalVoiceBox) elGlobalVoiceBox.hidden = true;
+        if(elGlobalVoiceButton) elGlobalVoiceButton.classList.remove('on');
+        if(elGlobalVoiceInput) elGlobalVoiceInput.value = '';
+        parsedGlobalVoice = null;
+        updateGlobalVoicePreview();
+      }
+
+      function saveDictatedContract(parsed){
+        const contract = parsed && parsed.contract;
+        if(!contract) return {ok:false, message:'Contrat invalide.'};
+
+        const tour = currentTour();
+        const existing = state.tours[String(tour)] && state.tours[String(tour)].contract;
+
+        if(parsed.pass){
+          if(existing && existing.kind !== 'pass'){
+            return {ok:false, message:'Une équipe est déjà partie, il faut supprimer son contrat'};
+          }
+
+          pushHistory(makeUndoLabel('Passe', 'Nous/Eux', tour));
+          const t = ensureTour(tour);
+          t.contract = { team: null, kind: 'pass', value: null, suit: 'none', coinche: 'none' };
+          t.points.Nous = 0;
+          t.points.Eux = 0;
+          saveState();
+          renderAll();
+          return {ok:true};
+        }
+
+        const team = contract.team === 'Eux' ? 'Eux' : 'Nous';
+        if(existing && existing.team && existing.team !== team){
+          return {ok:false, message:'L’autre équipe est déjà partie, il faut supprimer son contrat avant d’en entrer un autre'};
+        }
+
+        pushHistory(makeUndoLabel('Contrat', team, tour));
+        const t = ensureTour(tour);
+        t.contract = deepClone(contract);
+        saveState();
+        renderAll();
+        return {ok:true};
+      }
+
+      function saveDictatedPoints(parsed){
+        const tour = currentTour();
+        const team = parsed && parsed.team === 'Eux' ? 'Eux' : 'Nous';
+        const points = parsed ? parsed.points : null;
+        if(!isFiniteNumber(points)) return {ok:false, message:'Points invalides.'};
+
+        pushHistory(makeUndoLabel('Points', team, tour));
+        const t = ensureTour(tour);
+        t.points[team] = points;
+        saveState();
+        renderAll();
+        return {ok:true};
+      }
+
+      function applyGlobalVoice(){
+        updateGlobalVoicePreview();
+        if(!parsedGlobalVoice || !elGlobalVoiceResult) return;
+
+        const result = parsedGlobalVoice.type === 'contract'
+          ? saveDictatedContract(parsedGlobalVoice.parsed)
+          : saveDictatedPoints(parsedGlobalVoice.parsed);
+
+        if(result.ok){
+          closeGlobalVoiceBox();
+          return;
+        }
+
+        elGlobalVoiceResult.className = 'voiceResult bad';
+        elGlobalVoiceResult.textContent = result.message || 'Validation impossible.';
+      }
+
+      if(elGlobalVoiceButton){
+        elGlobalVoiceButton.addEventListener('click', () => {
+          if(elGlobalVoiceBox && !elGlobalVoiceBox.hidden) closeGlobalVoiceBox();
+          else openGlobalVoiceBox();
+        });
+      }
+
+      if(elGlobalVoiceInput){
+        elGlobalVoiceInput.addEventListener('input', updateGlobalVoicePreview);
+        elGlobalVoiceInput.addEventListener('focus', keepGlobalVoiceVisible);
+        elGlobalVoiceInput.addEventListener('keydown', (e) => {
+          if(e.key !== 'Enter') return;
+          e.preventDefault();
+          if(parsedGlobalVoice) applyGlobalVoice();
+        });
+      }
+
+      if(elGlobalVoiceRetry){
+        elGlobalVoiceRetry.addEventListener('click', () => {
+          if(elGlobalVoiceInput) elGlobalVoiceInput.value = '';
+          updateGlobalVoicePreview();
+          startGlobalSpeechRecognition();
+        });
+      }
+
+      if(elGlobalVoiceCancel){
+        elGlobalVoiceCancel.addEventListener('click', closeGlobalVoiceBox);
+      }
+
+      if(elGlobalVoiceValidate){
+        elGlobalVoiceValidate.addEventListener('click', applyGlobalVoice);
       }
 
       function renderSheet(){
@@ -2949,7 +3310,6 @@
 
       let activePanel = null; // 'contrat'|'points'|'autres'|null
       let stopActiveVoiceCapture = null;
-      let voiceKeyboardAssistCleanup = null;
 
       function setActiveVoiceCaptureStop(fn){
         stopActiveVoiceCapture = (typeof fn === 'function') ? fn : null;
@@ -2970,56 +3330,9 @@
         return inset > 80 ? Math.ceil(inset) : 0;
       }
 
-      function clearVoiceKeyboardAssist(){
-        if(voiceKeyboardAssistCleanup){
-          try{ voiceKeyboardAssistCleanup(); }catch(e){}
-          voiceKeyboardAssistCleanup = null;
-        }
-        panelBody.style.setProperty('--keyboard-inset', '0px');
-      }
-
-      function keepVoiceDictationVisible(inputEl){
-        if(!inputEl) return;
-        clearVoiceKeyboardAssist();
-
-        const update = () => {
-          const inset = keyboardInsetPx();
-          panelBody.style.setProperty('--keyboard-inset', inset ? `${inset + 18}px` : '0px');
-
-          const bodyRect = panelBody.getBoundingClientRect();
-          const inputRect = inputEl.getBoundingClientRect();
-          const targetTop = Math.max(0, panelBody.scrollTop + inputRect.top - bodyRect.top - 8);
-
-          try{
-            panelBody.scrollTo({top: targetTop, behavior:'smooth'});
-          }catch(e){
-            panelBody.scrollTop = targetTop;
-          }
-        };
-
-        const vv = window.visualViewport;
-        if(vv){
-          vv.addEventListener('resize', update);
-          vv.addEventListener('scroll', update);
-        }
-        window.addEventListener('resize', update);
-        voiceKeyboardAssistCleanup = () => {
-          if(vv){
-            vv.removeEventListener('resize', update);
-            vv.removeEventListener('scroll', update);
-          }
-          window.removeEventListener('resize', update);
-        };
-
-        update();
-        setTimeout(update, 120);
-        setTimeout(update, 360);
-        setTimeout(update, 720);
-      }
-
       function openPanel(which){
+        closeGlobalVoiceBox();
         stopVoiceCapture();
-        clearVoiceKeyboardAssist();
         activePanel = which;
         panelTitle.textContent = which === 'contrat' ? 'Contrat' : (which === 'points' ? 'Points' : 'Autres');
 
@@ -3034,7 +3347,6 @@
 
       function closePanel(){
         stopVoiceCapture();
-        clearVoiceKeyboardAssist();
         activePanel = null;
         placementOpen = false; // replier "Placement" à chaque fermeture
         overlay.classList.remove('open');
@@ -3109,20 +3421,6 @@
             </select>
           </div>
 
-          <div class="field">
-            <button class="voiceButton" id="cVoice" type="button">Dicter</button>
-            <div class="voiceBox" id="cVoiceBox" hidden>
-              <div class="voiceTitle">Dictée</div>
-              <input id="cVoiceInput" type="text" placeholder="nous 100 coeur" autocomplete="off" autocapitalize="none" enterkeyhint="done"/>
-              <div class="voiceResult" id="cVoiceResult">...</div>
-              <div class="voiceActions">
-                <button class="primary" id="cVoiceValidate" type="button" disabled>Valider</button>
-                <button id="cVoiceRetry" type="button">Redicter</button>
-                <button class="danger" id="cVoiceCancel" type="button">Annuler</button>
-              </div>
-            </div>
-          </div>
-
           <button class="primary" id="cSave" style="display:none;">Valider</button>
           <div class="warning" id="cWarn" style="display:none;"></div>
           <div class="error" id="cError" style="display:none;"></div>
@@ -3139,15 +3437,6 @@
         const kindWrap = document.getElementById('cKind');
         const numberWrap = document.getElementById('cNumberWrap');
         const cValue = document.getElementById('cValue');
-        const cVoice = document.getElementById('cVoice');
-        const cVoiceBox = document.getElementById('cVoiceBox');
-        const cVoiceInput = document.getElementById('cVoiceInput');
-        const cVoiceResult = document.getElementById('cVoiceResult');
-        const cVoiceValidate = document.getElementById('cVoiceValidate');
-        const cVoiceRetry = document.getElementById('cVoiceRetry');
-        const cVoiceCancel = document.getElementById('cVoiceCancel');
-        let parsedVoiceContract = null;
-        let cVoiceRecognition = null;
 
         // Defaults
         cTour.value = String(cur);
@@ -3271,25 +3560,6 @@
 
 		cValue.addEventListener('input', updateContratSaveVisibility);
 
-        cVoice.addEventListener('click', openContractVoiceBox);
-        cVoiceInput.addEventListener('input', updateContractVoicePreview);
-        cVoiceInput.addEventListener('keydown', (e) => {
-          if(e.key !== 'Enter') return;
-          e.preventDefault();
-          if(parsedVoiceContract) cVoiceValidate.click();
-        });
-        cVoiceRetry.addEventListener('click', () => {
-          cVoiceInput.value = '';
-          updateContractVoicePreview();
-          startContractSpeechRecognition();
-        });
-        cVoiceCancel.addEventListener('click', closeContractVoiceBox);
-        cVoiceValidate.addEventListener('click', () => {
-          updateContractVoicePreview();
-          if(!parsedVoiceContract) return;
-          applyDictatedContract(parsedVoiceContract);
-        });
-
         function prefillContrat(tour){
           ensureTour(tour);
           const t = state.tours[String(tour)];
@@ -3320,168 +3590,6 @@
           }
           setError('');
 		  updateContratSaveVisibility();
-        }
-
-        function focusContractVoiceInput(){
-          try{
-            cVoiceInput.focus({preventScroll:false});
-          }catch(e){
-            cVoiceInput.focus();
-          }
-          cVoiceInput.select();
-          keepVoiceDictationVisible(cVoiceInput);
-        }
-
-        function stopContractSpeechRecognition(){
-          const recognition = cVoiceRecognition;
-          cVoiceRecognition = null;
-          setActiveVoiceCaptureStop(null);
-          if(!recognition) return;
-          recognition.onresult = null;
-          recognition.onerror = null;
-          recognition.onend = null;
-          recognition.onnomatch = null;
-          try{ recognition.abort(); }catch(e){}
-        }
-
-        function showContractVoiceFallback(msg){
-          cVoiceResult.className = 'voiceResult';
-          cVoiceResult.textContent = msg || 'Dictée clavier prête.';
-          focusContractVoiceInput();
-        }
-
-        function startContractSpeechRecognition(){
-          stopContractSpeechRecognition();
-
-          const recognition = createSpeechRecognition();
-          if(!recognition){
-            showContractVoiceFallback('Micro auto indisponible. Dictée clavier prête.');
-            return;
-          }
-
-          cVoiceRecognition = recognition;
-          setActiveVoiceCaptureStop(stopContractSpeechRecognition);
-          cVoiceResult.className = 'voiceResult';
-          cVoiceResult.textContent = 'Écoute...';
-          cVoiceValidate.disabled = true;
-
-          let gotResult = false;
-
-          recognition.onresult = (event) => {
-            if(cVoiceRecognition !== recognition) return;
-            gotResult = true;
-            const transcript = speechTranscriptFromEvent(event);
-            cVoiceRecognition = null;
-            setActiveVoiceCaptureStop(null);
-
-            if(!transcript){
-              showContractVoiceFallback("Je n'ai rien entendu. Dictée clavier prête.");
-              return;
-            }
-
-            cVoiceInput.value = transcript;
-            updateContractVoicePreview();
-            if(!parsedVoiceContract) focusContractVoiceInput();
-          };
-
-          recognition.onerror = () => {
-            if(cVoiceRecognition !== recognition) return;
-            cVoiceRecognition = null;
-            setActiveVoiceCaptureStop(null);
-            showContractVoiceFallback('Micro auto indisponible. Dictée clavier prête.');
-          };
-
-          recognition.onnomatch = () => {
-            if(cVoiceRecognition !== recognition) return;
-            cVoiceRecognition = null;
-            setActiveVoiceCaptureStop(null);
-            showContractVoiceFallback("Je n'ai rien entendu. Dictée clavier prête.");
-          };
-
-          recognition.onend = () => {
-            if(cVoiceRecognition !== recognition) return;
-            cVoiceRecognition = null;
-            setActiveVoiceCaptureStop(null);
-            if(!gotResult && !String(cVoiceInput.value || '').trim()){
-              showContractVoiceFallback("Je n'ai rien entendu. Dictée clavier prête.");
-            }
-          };
-
-          try{
-            recognition.start();
-          }catch(e){
-            cVoiceRecognition = null;
-            setActiveVoiceCaptureStop(null);
-            showContractVoiceFallback('Micro auto indisponible. Dictée clavier prête.');
-          }
-        }
-
-        function updateContractVoicePreview(){
-          const raw = cVoiceInput.value;
-          const parsed = parseDictatedContract(raw);
-          parsedVoiceContract = parsed.ok ? parsed : null;
-          cVoiceValidate.disabled = !parsedVoiceContract;
-          cVoiceResult.className = 'voiceResult';
-
-          if(!String(raw || '').trim()){
-            cVoiceResult.textContent = '...';
-            return;
-          }
-
-          if(parsedVoiceContract){
-            cVoiceResult.classList.add('ok');
-            cVoiceResult.textContent = parsedVoiceContract.label;
-          }else{
-            cVoiceResult.classList.add('bad');
-            cVoiceResult.textContent = parsed.message;
-          }
-        }
-
-        function openContractVoiceBox(){
-          cVoiceBox.hidden = false;
-          cSave.style.display = 'none';
-          cVoiceInput.value = '';
-          updateContractVoicePreview();
-          startContractSpeechRecognition();
-        }
-
-        function closeContractVoiceBox(){
-          stopContractSpeechRecognition();
-          clearVoiceKeyboardAssist();
-          cVoiceBox.hidden = true;
-          cVoiceInput.value = '';
-          parsedVoiceContract = null;
-          updateContractVoicePreview();
-          updateContratSaveVisibility();
-        }
-
-        function applyDictatedContract(parsed){
-          const c = parsed.contract;
-          if(parsed.pass){
-            closeContractVoiceBox();
-            cPass.click();
-            return;
-          }
-
-          cWho.value = c.team === 'Eux' ? 'Eux' : 'Nous';
-          cCoinche.value = c.coinche || 'none';
-
-          if(c.kind === 'number'){
-            setKind('number');
-            cValue.value = String(c.value);
-            setSuit(c.suit || 'spade');
-          }else if(c.kind === 'cap'){
-            setKind('cap');
-            cValue.value = '';
-            setSuit(c.suit || 'spade');
-          }else if(c.kind === 'gen'){
-            setKind('gen');
-            cValue.value = '';
-            setSuit('none');
-          }
-
-          closeContractVoiceBox();
-          cSave.click();
         }
 
 		cPass.addEventListener('click', () => {
@@ -3608,20 +3716,6 @@
             <input id="pValue" type="number" step="1" inputmode="numeric" placeholder="000"/>
           </div>
 
-          <div class="field">
-            <button class="voiceButton" id="pVoice" type="button">Dicter</button>
-            <div class="voiceBox" id="pVoiceBox" hidden>
-              <div class="voiceTitle">Dictée</div>
-              <input id="pVoiceInput" type="text" placeholder="100 points pour eux" autocomplete="off" autocapitalize="none" enterkeyhint="done"/>
-              <div class="voiceResult" id="pVoiceResult">...</div>
-              <div class="voiceActions">
-                <button class="primary" id="pVoiceValidate" type="button" disabled>Valider</button>
-                <button id="pVoiceRetry" type="button">Redicter</button>
-                <button class="danger" id="pVoiceCancel" type="button">Annuler</button>
-              </div>
-            </div>
-          </div>
-
           <button class="primary" id="pSave">Valider</button>
           <div class="warning" id="pWarn" style="display:none;"></div>
           <div class="error" id="pError" style="display:none;"></div>
@@ -3633,15 +3727,6 @@
         const pWarn = document.getElementById('pWarn');
         const pError = document.getElementById('pError');
         const pSave = document.getElementById('pSave');
-        const pVoice = document.getElementById('pVoice');
-        const pVoiceBox = document.getElementById('pVoiceBox');
-        const pVoiceInput = document.getElementById('pVoiceInput');
-        const pVoiceResult = document.getElementById('pVoiceResult');
-        const pVoiceValidate = document.getElementById('pVoiceValidate');
-        const pVoiceRetry = document.getElementById('pVoiceRetry');
-        const pVoiceCancel = document.getElementById('pVoiceCancel');
-        let parsedVoicePoints = null;
-        let pVoiceRecognition = null;
 
         pTour.value = String(cur);
         const who0 = suggestWhoForTour(cur);
@@ -3711,139 +3796,6 @@
           setError('');
         }
 
-        function focusVoiceInput(){
-          try{
-            pVoiceInput.focus({preventScroll:false});
-          }catch(e){
-            pVoiceInput.focus();
-          }
-          pVoiceInput.select();
-          keepVoiceDictationVisible(pVoiceInput);
-        }
-
-        function stopPointSpeechRecognition(){
-          const recognition = pVoiceRecognition;
-          pVoiceRecognition = null;
-          setActiveVoiceCaptureStop(null);
-          if(!recognition) return;
-          recognition.onresult = null;
-          recognition.onerror = null;
-          recognition.onend = null;
-          recognition.onnomatch = null;
-          try{ recognition.abort(); }catch(e){}
-        }
-
-        function showPointVoiceFallback(msg){
-          pVoiceResult.className = 'voiceResult';
-          pVoiceResult.textContent = msg || 'Dictée clavier prête.';
-          focusVoiceInput();
-        }
-
-        function startPointSpeechRecognition(){
-          stopPointSpeechRecognition();
-
-          const recognition = createSpeechRecognition();
-          if(!recognition){
-            showPointVoiceFallback('Micro auto indisponible. Dictée clavier prête.');
-            return;
-          }
-
-          pVoiceRecognition = recognition;
-          setActiveVoiceCaptureStop(stopPointSpeechRecognition);
-          pVoiceResult.className = 'voiceResult';
-          pVoiceResult.textContent = 'Écoute...';
-          pVoiceValidate.disabled = true;
-
-          let gotResult = false;
-
-          recognition.onresult = (event) => {
-            if(pVoiceRecognition !== recognition) return;
-            gotResult = true;
-            const transcript = speechTranscriptFromEvent(event);
-            pVoiceRecognition = null;
-            setActiveVoiceCaptureStop(null);
-
-            if(!transcript){
-              showPointVoiceFallback("Je n'ai rien entendu. Dictée clavier prête.");
-              return;
-            }
-
-            pVoiceInput.value = transcript;
-            updateVoicePreview();
-            if(!parsedVoicePoints) focusVoiceInput();
-          };
-
-          recognition.onerror = () => {
-            if(pVoiceRecognition !== recognition) return;
-            pVoiceRecognition = null;
-            setActiveVoiceCaptureStop(null);
-            showPointVoiceFallback('Micro auto indisponible. Dictée clavier prête.');
-          };
-
-          recognition.onnomatch = () => {
-            if(pVoiceRecognition !== recognition) return;
-            pVoiceRecognition = null;
-            setActiveVoiceCaptureStop(null);
-            showPointVoiceFallback("Je n'ai rien entendu. Dictée clavier prête.");
-          };
-
-          recognition.onend = () => {
-            if(pVoiceRecognition !== recognition) return;
-            pVoiceRecognition = null;
-            setActiveVoiceCaptureStop(null);
-            if(!gotResult && !String(pVoiceInput.value || '').trim()){
-              showPointVoiceFallback("Je n'ai rien entendu. Dictée clavier prête.");
-            }
-          };
-
-          try{
-            recognition.start();
-          }catch(e){
-            pVoiceRecognition = null;
-            setActiveVoiceCaptureStop(null);
-            showPointVoiceFallback('Micro auto indisponible. Dictée clavier prête.');
-          }
-        }
-
-        function updateVoicePreview(){
-          const raw = pVoiceInput.value;
-          const parsed = parseDictatedPoints(raw);
-          parsedVoicePoints = parsed.ok ? parsed : null;
-          pVoiceValidate.disabled = !parsedVoicePoints;
-          pVoiceResult.className = 'voiceResult';
-
-          if(!String(raw || '').trim()){
-            pVoiceResult.textContent = '...';
-            return;
-          }
-
-          if(parsedVoicePoints){
-            pVoiceResult.classList.add('ok');
-            pVoiceResult.textContent = `${parsedVoicePoints.team} ${formatSigned(parsedVoicePoints.points)}`;
-          }else{
-            pVoiceResult.classList.add('bad');
-            pVoiceResult.textContent = parsed.message;
-          }
-        }
-
-        function openVoiceBox(){
-          pVoiceBox.hidden = false;
-          pSave.style.display = 'none';
-          pVoiceInput.value = '';
-          updateVoicePreview();
-          startPointSpeechRecognition();
-        }
-
-        function closeVoiceBox(){
-          stopPointSpeechRecognition();
-          clearVoiceKeyboardAssist();
-          pVoiceBox.hidden = true;
-          pSave.style.display = '';
-          pVoiceInput.value = '';
-          parsedVoicePoints = null;
-          updateVoicePreview();
-        }
-
         pTour.addEventListener('change', () => {
           const tour = parseIntSafe(pTour.value);
           if(!tour || tour < 1){
@@ -3863,29 +3815,6 @@
         pWho.addEventListener('change', () => {
           const tour = parseIntSafe(pTour.value) || cur;
           prefillPoints(tour, pWho.value);
-        });
-
-        pVoice.addEventListener('click', openVoiceBox);
-        pVoiceInput.addEventListener('input', updateVoicePreview);
-        pVoiceInput.addEventListener('keydown', (e) => {
-          if(e.key !== 'Enter') return;
-          e.preventDefault();
-          if(parsedVoicePoints) pVoiceValidate.click();
-        });
-        pVoiceRetry.addEventListener('click', () => {
-          pVoiceInput.value = '';
-          updateVoicePreview();
-          startPointSpeechRecognition();
-        });
-        pVoiceCancel.addEventListener('click', closeVoiceBox);
-        pVoiceValidate.addEventListener('click', () => {
-          updateVoicePreview();
-          if(!parsedVoicePoints) return;
-
-          pWho.value = parsedVoicePoints.team;
-          pValue.value = String(parsedVoicePoints.points);
-          closeVoiceBox();
-          pSave.click();
         });
 
         pSave.addEventListener('click', () => {
