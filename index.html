@@ -1355,6 +1355,7 @@
         return String(raw || '')
           .toLowerCase()
           .normalize('NFD')
+          .replace(/œ/g, 'oe')
           .replace(/[\u0300-\u036f]/g, '')
           .replace(/[’']/g, ' ')
           .replace(/[-_]/g, ' ')
@@ -1475,6 +1476,95 @@
         if(points === null) return {ok:false, message:"Je n'ai pas compris les points."};
 
         return {ok:true, team, points};
+      }
+
+      function detectDictatedTeam(normalized){
+        const hasNous = /\b(nous|notre|nos)\b/.test(normalized);
+        const hasEux = /\b(eux|leur|leurs|adversaire|adversaires)\b/.test(normalized);
+        return {
+          hasNous,
+          hasEux,
+          ambiguous: hasNous && hasEux,
+          team: hasEux && !hasNous ? 'Eux' : (hasNous && !hasEux ? 'Nous' : null)
+        };
+      }
+
+      function parseDictatedSuit(normalized){
+        const matches = [];
+        if(/\b(pique|piques|pic|spade|spades)\b/.test(normalized)) matches.push({id:'spade', label:'pique'});
+        if(/\b(trefle|trefles|treffle|treffles|club|clubs)\b/.test(normalized)) matches.push({id:'club', label:'trefle'});
+        if(/\b(coeur|coeurs|heart|hearts)\b/.test(normalized)) matches.push({id:'heart', label:'coeur'});
+        if(/\b(carreau|carreaux|caro|diamond|diamonds)\b/.test(normalized)) matches.push({id:'diamond', label:'carreau'});
+
+        const unique = [];
+        for(const m of matches){
+          if(!unique.some(u => u.id === m.id)) unique.push(m);
+        }
+
+        if(unique.length > 1) return {ok:false, ambiguous:true, message:'Choisis une seule couleur.'};
+        if(unique.length === 1) return {ok:true, suit:unique[0].id, label:unique[0].label};
+        return {ok:false, missing:true, message:'Je n\'ai pas compris la couleur.'};
+      }
+
+      function parseDictatedCoinche(normalized){
+        if(/\b(sur\s*coinche|surcoinche|sur\s*coince|surcoince)\b/.test(normalized)) return 'SC';
+        if(/\b(coinche|coince|contre|contre)\b/.test(normalized)) return 'C';
+        return 'none';
+      }
+
+      function parseDictatedContract(raw){
+        const normalized = normalizeSpeechText(raw);
+        if(!normalized) return {ok:false, message:'Dicte le contrat.'};
+
+        if(/\b(tout le monde passe|passe|passent|personne)\b/.test(normalized)){
+          return {
+            ok: true,
+            pass: true,
+            label: 'Tout le monde passe',
+            contract: { team: null, kind: 'pass', value: null, suit: 'none', coinche: 'none' }
+          };
+        }
+
+        const teamInfo = detectDictatedTeam(normalized);
+        if(teamInfo.ambiguous) return {ok:false, message:'Choisis une seule équipe.'};
+
+        const team = teamInfo.team;
+        const isGen = /\b(gen|general|generale)\b/.test(normalized);
+        const isCap = /\b(cap|capot)\b/.test(normalized);
+        const coinche = parseDictatedCoinche(normalized);
+        const suitInfo = parseDictatedSuit(normalized);
+
+        if(!team) return {ok:false, message:"Je n'ai pas compris l'équipe."};
+        if(isGen && isCap) return {ok:false, message:'Choisis Cap ou Générale, pas les deux.'};
+
+        if(isGen){
+          return {
+            ok: true,
+            label: `${team} Générale${coinche === 'SC' ? ' surcoinché' : (coinche === 'C' ? ' coinché' : '')}`,
+            contract: { team, kind: 'gen', value: null, suit: 'none', coinche }
+          };
+        }
+
+        if(isCap){
+          if(!suitInfo.ok) return {ok:false, message:suitInfo.message};
+          return {
+            ok: true,
+            label: `${team} Cap ${suitInfo.label}${coinche === 'SC' ? ' surcoinché' : (coinche === 'C' ? ' coinché' : '')}`,
+            contract: { team, kind: 'cap', value: null, suit: suitInfo.suit, coinche }
+          };
+        }
+
+        const points = parseDictatedNumber(raw);
+        if(points === null) return {ok:false, message:'Je n\'ai pas compris les points.'};
+        if(points < 80) return {ok:false, message:'Les points doivent être au minimum de 80.'};
+        if(points % 10 !== 0) return {ok:false, message:'Les points doivent être un multiple de 10.'};
+        if(!suitInfo.ok) return {ok:false, message:suitInfo.message};
+
+        return {
+          ok: true,
+          label: `${team} ${points} ${suitInfo.label}${coinche === 'SC' ? ' surcoinché' : (coinche === 'C' ? ' coinché' : '')}`,
+          contract: { team, kind: 'number', value: points, suit: suitInfo.suit, coinche }
+        };
       }
 
       function formatSigned(n){
@@ -2907,6 +2997,20 @@
             </select>
           </div>
 
+          <div class="field">
+            <button class="voiceButton" id="cVoice" type="button">Dicter</button>
+            <div class="voiceBox" id="cVoiceBox" hidden>
+              <div class="voiceTitle">Dictée</div>
+              <input id="cVoiceInput" type="text" placeholder="nous 100 coeur" autocomplete="off" autocapitalize="none" enterkeyhint="done"/>
+              <div class="voiceResult" id="cVoiceResult">...</div>
+              <div class="voiceActions">
+                <button class="primary" id="cVoiceValidate" type="button" disabled>Valider</button>
+                <button id="cVoiceRetry" type="button">Redicter</button>
+                <button class="danger" id="cVoiceCancel" type="button">Annuler</button>
+              </div>
+            </div>
+          </div>
+
           <button class="primary" id="cSave" style="display:none;">Valider</button>
           <div class="warning" id="cWarn" style="display:none;"></div>
           <div class="error" id="cError" style="display:none;"></div>
@@ -2923,6 +3027,14 @@
         const kindWrap = document.getElementById('cKind');
         const numberWrap = document.getElementById('cNumberWrap');
         const cValue = document.getElementById('cValue');
+        const cVoice = document.getElementById('cVoice');
+        const cVoiceBox = document.getElementById('cVoiceBox');
+        const cVoiceInput = document.getElementById('cVoiceInput');
+        const cVoiceResult = document.getElementById('cVoiceResult');
+        const cVoiceValidate = document.getElementById('cVoiceValidate');
+        const cVoiceRetry = document.getElementById('cVoiceRetry');
+        const cVoiceCancel = document.getElementById('cVoiceCancel');
+        let parsedVoiceContract = null;
 
         // Defaults
         cTour.value = String(cur);
@@ -3046,6 +3158,25 @@
 
 		cValue.addEventListener('input', updateContratSaveVisibility);
 
+        cVoice.addEventListener('click', openContractVoiceBox);
+        cVoiceInput.addEventListener('input', updateContractVoicePreview);
+        cVoiceInput.addEventListener('keydown', (e) => {
+          if(e.key !== 'Enter') return;
+          e.preventDefault();
+          if(parsedVoiceContract) cVoiceValidate.click();
+        });
+        cVoiceRetry.addEventListener('click', () => {
+          cVoiceInput.value = '';
+          updateContractVoicePreview();
+          focusContractVoiceInput();
+        });
+        cVoiceCancel.addEventListener('click', closeContractVoiceBox);
+        cVoiceValidate.addEventListener('click', () => {
+          updateContractVoicePreview();
+          if(!parsedVoiceContract) return;
+          applyDictatedContract(parsedVoiceContract);
+        });
+
         function prefillContrat(tour){
           ensureTour(tour);
           const t = state.tours[String(tour)];
@@ -3076,6 +3207,81 @@
           }
           setError('');
 		  updateContratSaveVisibility();
+        }
+
+        function focusContractVoiceInput(){
+          try{
+            cVoiceInput.focus({preventScroll:false});
+          }catch(e){
+            cVoiceInput.focus();
+          }
+          cVoiceInput.select();
+        }
+
+        function updateContractVoicePreview(){
+          const raw = cVoiceInput.value;
+          const parsed = parseDictatedContract(raw);
+          parsedVoiceContract = parsed.ok ? parsed : null;
+          cVoiceValidate.disabled = !parsedVoiceContract;
+          cVoiceResult.className = 'voiceResult';
+
+          if(!String(raw || '').trim()){
+            cVoiceResult.textContent = '...';
+            return;
+          }
+
+          if(parsedVoiceContract){
+            cVoiceResult.classList.add('ok');
+            cVoiceResult.textContent = parsedVoiceContract.label;
+          }else{
+            cVoiceResult.classList.add('bad');
+            cVoiceResult.textContent = parsed.message;
+          }
+        }
+
+        function openContractVoiceBox(){
+          cVoiceBox.hidden = false;
+          cSave.style.display = 'none';
+          cVoiceInput.value = '';
+          updateContractVoicePreview();
+          focusContractVoiceInput();
+        }
+
+        function closeContractVoiceBox(){
+          cVoiceBox.hidden = true;
+          cVoiceInput.value = '';
+          parsedVoiceContract = null;
+          updateContractVoicePreview();
+          updateContratSaveVisibility();
+        }
+
+        function applyDictatedContract(parsed){
+          const c = parsed.contract;
+          if(parsed.pass){
+            closeContractVoiceBox();
+            cPass.click();
+            return;
+          }
+
+          cWho.value = c.team === 'Eux' ? 'Eux' : 'Nous';
+          cCoinche.value = c.coinche || 'none';
+
+          if(c.kind === 'number'){
+            setKind('number');
+            cValue.value = String(c.value);
+            setSuit(c.suit || 'spade');
+          }else if(c.kind === 'cap'){
+            setKind('cap');
+            cValue.value = '';
+            setSuit(c.suit || 'spade');
+          }else if(c.kind === 'gen'){
+            setKind('gen');
+            cValue.value = '';
+            setSuit('none');
+          }
+
+          closeContractVoiceBox();
+          cSave.click();
         }
 
 		cPass.addEventListener('click', () => {
