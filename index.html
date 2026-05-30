@@ -765,9 +765,11 @@
     }
 
     .panelBody{
+      --keyboard-inset: 0px;
       padding: 12px;
       overflow: auto;
-      padding-bottom: calc(18px + env(safe-area-inset-bottom));
+      padding-bottom: calc(18px + env(safe-area-inset-bottom) + var(--keyboard-inset));
+      scroll-padding-bottom: calc(18px + env(safe-area-inset-bottom) + var(--keyboard-inset));
     }
 
     .field{
@@ -2937,6 +2939,7 @@
 
       let activePanel = null; // 'contrat'|'points'|'autres'|null
       let stopActiveVoiceCapture = null;
+      let voiceKeyboardAssistCleanup = null;
 
       function setActiveVoiceCaptureStop(fn){
         stopActiveVoiceCapture = (typeof fn === 'function') ? fn : null;
@@ -2950,8 +2953,58 @@
         }
       }
 
+      function keyboardInsetPx(){
+        const vv = window.visualViewport;
+        if(!vv) return 0;
+        const inset = window.innerHeight - vv.height - vv.offsetTop;
+        return inset > 80 ? Math.ceil(inset) : 0;
+      }
+
+      function clearVoiceKeyboardAssist(){
+        if(voiceKeyboardAssistCleanup){
+          try{ voiceKeyboardAssistCleanup(); }catch(e){}
+          voiceKeyboardAssistCleanup = null;
+        }
+        panelBody.style.setProperty('--keyboard-inset', '0px');
+      }
+
+      function keepVoiceActionsVisible(actionsEl){
+        if(!actionsEl) return;
+        clearVoiceKeyboardAssist();
+
+        const update = () => {
+          const inset = keyboardInsetPx();
+          panelBody.style.setProperty('--keyboard-inset', inset ? `${inset + 18}px` : '0px');
+          try{
+            actionsEl.scrollIntoView({block:'nearest', inline:'nearest', behavior:'smooth'});
+          }catch(e){
+            try{ actionsEl.scrollIntoView(false); }catch(err){}
+          }
+        };
+
+        const vv = window.visualViewport;
+        if(vv){
+          vv.addEventListener('resize', update);
+          vv.addEventListener('scroll', update);
+        }
+        window.addEventListener('resize', update);
+        voiceKeyboardAssistCleanup = () => {
+          if(vv){
+            vv.removeEventListener('resize', update);
+            vv.removeEventListener('scroll', update);
+          }
+          window.removeEventListener('resize', update);
+        };
+
+        update();
+        setTimeout(update, 120);
+        setTimeout(update, 360);
+        setTimeout(update, 720);
+      }
+
       function openPanel(which){
         stopVoiceCapture();
+        clearVoiceKeyboardAssist();
         activePanel = which;
         panelTitle.textContent = which === 'contrat' ? 'Contrat' : (which === 'points' ? 'Points' : 'Autres');
 
@@ -2966,6 +3019,7 @@
 
       function closePanel(){
         stopVoiceCapture();
+        clearVoiceKeyboardAssist();
         activePanel = null;
         placementOpen = false; // replier "Placement" à chaque fermeture
         overlay.classList.remove('open');
@@ -3077,6 +3131,7 @@
         const cVoiceValidate = document.getElementById('cVoiceValidate');
         const cVoiceRetry = document.getElementById('cVoiceRetry');
         const cVoiceCancel = document.getElementById('cVoiceCancel');
+        const cVoiceActions = cVoiceBox.querySelector('.voiceActions');
         let parsedVoiceContract = null;
         let cVoiceRecognition = null;
 
@@ -3260,6 +3315,7 @@
             cVoiceInput.focus();
           }
           cVoiceInput.select();
+          keepVoiceActionsVisible(cVoiceActions);
         }
 
         function stopContractSpeechRecognition(){
@@ -3377,6 +3433,7 @@
 
         function closeContractVoiceBox(){
           stopContractSpeechRecognition();
+          clearVoiceKeyboardAssist();
           cVoiceBox.hidden = true;
           cVoiceInput.value = '';
           parsedVoiceContract = null;
@@ -3569,6 +3626,7 @@
         const pVoiceValidate = document.getElementById('pVoiceValidate');
         const pVoiceRetry = document.getElementById('pVoiceRetry');
         const pVoiceCancel = document.getElementById('pVoiceCancel');
+        const pVoiceActions = pVoiceBox.querySelector('.voiceActions');
         let parsedVoicePoints = null;
         let pVoiceRecognition = null;
 
@@ -3647,6 +3705,7 @@
             pVoiceInput.focus();
           }
           pVoiceInput.select();
+          keepVoiceActionsVisible(pVoiceActions);
         }
 
         function stopPointSpeechRecognition(){
@@ -3764,6 +3823,7 @@
 
         function closeVoiceBox(){
           stopPointSpeechRecognition();
+          clearVoiceKeyboardAssist();
           pVoiceBox.hidden = true;
           pSave.style.display = '';
           pVoiceInput.value = '';
