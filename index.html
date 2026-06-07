@@ -67,6 +67,7 @@
 	  --panel-w: min(320px, 82vw);
 	  --bar-h: 64px;
 	  --sheetHeaderH: calc(env(safe-area-inset-top) + 44px);
+	  --sheetHeaderGap: 10px;
 	  --floating-controls-gap: 12px;
 	  --floating-control-height: 44px;
 	  --dealer-grid-height: 98px;
@@ -138,7 +139,7 @@
       overflow: visible;
       border: 1px solid var(--line);
       background: #fff;
-      padding-top: var(--sheetHeaderH);
+      padding-top: calc(var(--sheetHeaderH) + var(--sheetHeaderGap));
     }
 	
     /* Graph view */
@@ -1318,10 +1319,10 @@
     font-size: 22px;
     letter-spacing: .16em;
     text-transform: uppercase;
-    color: rgb(var(--blue-rgb));
+    color: var(--fg);
     text-shadow: 0 1px 0 rgba(255,255,255,.18);
   }
-  .sheetHeader .team.teamEux{ color: rgb(var(--red-rgb)); }
+  .sheetHeader .team.teamEux{ color: var(--fg); }
   .sheetHeader .divider{
     background: linear-gradient(180deg, transparent, var(--gold-2) 18%, var(--gold) 82%, transparent);
     width: 2px; border-radius: 2px;
@@ -5119,6 +5120,16 @@
         if(showingGraph) renderGraph();
         if(!showingGraph && !showingStats) syncSheetHeaderSpace();
       });
+
+      window.addEventListener('load', () => {
+        if(!showingGraph && !showingStats) syncSheetHeaderSpace();
+      });
+
+      if(document.fonts && document.fonts.ready){
+        document.fonts.ready.then(() => {
+          if(!showingGraph && !showingStats) syncSheetHeaderSpace();
+        }).catch(() => {});
+      }
 
       // Keyboard: Esc closes panel (desktop)
       window.addEventListener('keydown', (e) => {
