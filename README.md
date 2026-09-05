@@ -137,6 +137,7 @@ Le fichier inclut déjà :
 - `apple-mobile-web-app-capable`
 - `apple-touch-icon`
 - `viewport-fit=cover`
+- respect des zones sûres iOS pour les en-têtes et leurs boutons de fermeture
 
 Donc l’app peut être ajoutée à l’écran d’accueil iOS comme pseudo-PWA.
 
