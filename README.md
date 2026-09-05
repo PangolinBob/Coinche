@@ -96,8 +96,9 @@ Panneau **Autres** :
 - inversion possible Nous/Eux sur historique (avec confirmation),
 - verrouillage du placement si partie déjà commencée.
 
-## 8) Undo / Reset
-- **Undo** avec historique local (jusqu’à 60 actions).
+## 8) Undo / Redo / Reset
+- **Undo / Redo** avec historique local (jusqu’à 60 actions), conservé après fermeture de l’application.
+- Une nouvelle saisie après un Undo invalide les actions qui pouvaient encore être rétablies.
 - **Nouvelle partie** (reset complet) avec confirmation.
 
 ---
