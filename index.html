@@ -1911,7 +1911,36 @@
 
       const STORAGE_KEY = 'coinche_app_v1';
       const MAX_HISTORY = 60;
-      const APP_VERSION = '1.0.6';
+      const APP_VERSION = '1.0.7';
+
+      // Garde l’écran allumé tant que l’application est visible. iOS libère
+      // automatiquement le verrou quand l’app passe en arrière-plan.
+      let screenWakeLock = null;
+      let screenWakeLockRequestPending = false;
+
+      async function keepScreenAwake(){
+        if(!('wakeLock' in navigator) || document.visibilityState !== 'visible') return;
+        if(screenWakeLock && !screenWakeLock.released) return;
+        if(screenWakeLockRequestPending) return;
+        screenWakeLock = null;
+
+        screenWakeLockRequestPending = true;
+        try{
+          const lock = await navigator.wakeLock.request('screen');
+          screenWakeLock = lock;
+          lock.addEventListener('release', () => {
+            if(screenWakeLock === lock) screenWakeLock = null;
+          });
+        }catch(e){
+          // Peut être refusé par iOS (par exemple en mode économie d’énergie).
+          // Un prochain geste ou retour au premier plan déclenchera un nouvel essai.
+        }finally{
+          screenWakeLockRequestPending = false;
+        }
+      }
+
+      keepScreenAwake();
+      document.addEventListener('pointerdown', keepScreenAwake, {passive:true});
 	  
       // -------- Préférence : afficher l'accueil ----------
       const HOME_PREF_KEY = 'coinche_home_enabled';
@@ -5148,7 +5177,10 @@
 
       // Afficher l'accueil à chaque retour au premier plan (PWA iPhone)
       document.addEventListener('visibilitychange', () => {
-        if(document.visibilityState === 'visible') showHome();
+        if(document.visibilityState === 'visible'){
+          showHome();
+          keepScreenAwake();
+        }
       });
 	  
       window.addEventListener('resize', () => {

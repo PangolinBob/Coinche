@@ -22,6 +22,7 @@ Le tout sans backend, avec persistance locale via `localStorage`.
 - HTML/CSS/JS vanilla (aucune dépendance)
 - stockage local navigateur (`localStorage`)
 - optimisations iOS/PWA (meta tags Apple, icône Home Screen)
+- maintien de l’écran allumé tant que l’application reste visible au premier plan (iOS/iPadOS 18.4 ou ultérieur pour une app installée sur l’écran d’accueil)
 
 ---
 
