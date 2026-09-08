@@ -23,6 +23,7 @@ Le tout sans backend, avec persistance locale via `localStorage`.
 - stockage local navigateur (`localStorage`)
 - optimisations iOS/PWA (meta tags Apple, icône Home Screen)
 - maintien de l’écran allumé tant que l’application reste visible au premier plan (iOS/iPadOS 18.4 ou ultérieur pour une app installée sur l’écran d’accueil)
+- copie locale automatique de l’application : la feuille de score continue de s’ouvrir si le réseau ou le serveur vocal est momentanément indisponible
 
 ---
 

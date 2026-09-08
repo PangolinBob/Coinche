@@ -1911,7 +1911,7 @@
 
       const STORAGE_KEY = 'coinche_app_v1';
       const MAX_HISTORY = 60;
-      const APP_VERSION = '1.0.7';
+      const APP_VERSION = '1.0.8';
 
       // Garde l’écran allumé tant que l’application est visible. iOS libère
       // automatiquement le verrou quand l’app passe en arrière-plan.
@@ -5169,6 +5169,14 @@
           .replaceAll('>','&gt;')
           .replaceAll('"','&quot;')
           .replaceAll("'","&#039;");
+      }
+
+      // Conserve la feuille de score sur l’appareil pour qu’elle s’ouvre
+      // même si le serveur est momentanément indisponible.
+      if('serviceWorker' in navigator){
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js', {scope:'./'}).catch(() => {});
+        }, {once:true});
       }
 
       // Initial render
