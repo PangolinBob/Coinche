@@ -1911,7 +1911,7 @@
 
       const STORAGE_KEY = 'coinche_app_v1';
       const MAX_HISTORY = 60;
-      const APP_VERSION = '1.0.8';
+      const APP_VERSION = '1.0.9';
 
       // Garde l’écran allumé tant que l’application est visible. iOS libère
       // automatiquement le verrou quand l’app passe en arrière-plan.
@@ -2665,6 +2665,7 @@
 
       let parsedGlobalVoice = null;
       let globalVoiceRecognition = null;
+      let globalVoiceWatchdog = null;
       let globalVoiceKeyboardCleanup = null;
 
       function syncSheetHeaderSpace(){
@@ -2838,6 +2839,10 @@
       }
 
       function stopGlobalSpeechRecognition(){
+        if(globalVoiceWatchdog !== null){
+          clearTimeout(globalVoiceWatchdog);
+          globalVoiceWatchdog = null;
+        }
         const recognition = globalVoiceRecognition;
         globalVoiceRecognition = null;
         setActiveVoiceCaptureStop(null);
@@ -2912,9 +2917,19 @@
         setGlobalVoiceStatus('Écoute...', 'listening');
         if(elGlobalVoiceValidate) elGlobalVoiceValidate.disabled = true;
 
-        let gotResult = false;
-        let gotFinalResult = false;
         let latestTranscript = '';
+
+        // Some iPhone sessions open the microphone but never report a result or end.
+        globalVoiceWatchdog = setTimeout(() => {
+          if(globalVoiceRecognition !== recognition) return;
+          stopGlobalSpeechRecognition();
+          if(latestTranscript){
+            updateGlobalVoicePreview();
+            if(!parsedGlobalVoice) focusGlobalVoiceInput();
+          }else{
+            showGlobalVoiceFallback('La dictée ne répond pas. Touche Redicter ou utilise le micro du clavier.');
+          }
+        }, 12000);
 
         recognition.onaudiostart = () => {
           if(globalVoiceRecognition !== recognition || latestTranscript) return;
@@ -2943,12 +2958,10 @@
 
         recognition.onresult = (event) => {
           if(globalVoiceRecognition !== recognition) return;
-          gotResult = true;
           const transcript = speechTranscriptFromEvent(event);
 
           if(!transcript.text){
-            globalVoiceRecognition = null;
-            setActiveVoiceCaptureStop(null);
+            stopGlobalSpeechRecognition();
             showGlobalVoiceFallback("Je n'ai rien entendu. Dictée clavier prête.");
             return;
           }
@@ -2956,13 +2969,9 @@
           latestTranscript = transcript.text;
           elGlobalVoiceInput.value = latestTranscript;
 
-          if(transcript.isFinal){
-            gotFinalResult = true;
-            globalVoiceRecognition = null;
-            setActiveVoiceCaptureStop(null);
-            setGlobalVoiceListening(false);
-          }
-
+          // A final transcript does not mean the capture has ended on iPhone.
+          // Release it explicitly before forgetting it or allowing another dictation.
+          if(transcript.isFinal) stopGlobalSpeechRecognition();
           updateGlobalVoicePreview();
 
           if(!transcript.isFinal){
@@ -2975,31 +2984,23 @@
 
         recognition.onerror = () => {
           if(globalVoiceRecognition !== recognition) return;
-          globalVoiceRecognition = null;
-          setActiveVoiceCaptureStop(null);
-          setGlobalVoiceListening(false);
+          stopGlobalSpeechRecognition();
           showGlobalVoiceFallback('Micro auto indisponible. Dictée clavier prête.');
         };
 
         recognition.onnomatch = () => {
           if(globalVoiceRecognition !== recognition) return;
-          globalVoiceRecognition = null;
-          setActiveVoiceCaptureStop(null);
-          setGlobalVoiceListening(false);
+          stopGlobalSpeechRecognition();
           showGlobalVoiceFallback("Je n'ai rien entendu. Dictée clavier prête.");
         };
 
         recognition.onend = () => {
           if(globalVoiceRecognition !== recognition) return;
-          globalVoiceRecognition = null;
-          setActiveVoiceCaptureStop(null);
-          setGlobalVoiceListening(false);
-          if(latestTranscript && !gotFinalResult){
+          stopGlobalSpeechRecognition();
+          if(latestTranscript){
             updateGlobalVoicePreview();
             if(!parsedGlobalVoice) focusGlobalVoiceInput();
-            return;
-          }
-          if(!gotResult && !String(elGlobalVoiceInput.value || '').trim()){
+          }else{
             showGlobalVoiceFallback("Je n'ai rien entendu. Dictée clavier prête.");
           }
         };
@@ -3007,9 +3008,7 @@
         try{
           recognition.start();
         }catch(e){
-          globalVoiceRecognition = null;
-          setActiveVoiceCaptureStop(null);
-          setGlobalVoiceListening(false);
+          stopGlobalSpeechRecognition();
           showGlobalVoiceFallback('Micro auto indisponible. Dictée clavier prête.');
         }
       }
